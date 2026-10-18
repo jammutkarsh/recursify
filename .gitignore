@@ -27,3 +27,10 @@ dist-ssr
 .agents
 tsconfig.tsbuildinfo
 .wrangler
+.vinext/
+.cloudflare/
+dist
+.env*
+.dev.vars*
+!.dev.vars.example
+next-env.d.ts

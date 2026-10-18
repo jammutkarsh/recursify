@@ -2,27 +2,35 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTracker } from "../context/TrackerContext";
-import { Info } from "lucide-react";
+import { Flame, Info, Repeat } from "lucide-react";
 import BackToTopButton from "../components/BackToTopButton";
 import CustomSetManager from "../components/CustomSetManager";
 import Filters from "../components/Filters";
 import ProblemTable from "../components/ProblemTable";
+import ReviewQueue from "../components/ReviewQueue";
 import {
   builtinProblemLists,
-  calculateNextReviews,
   CUSTOM_TRACKING_LIST,
+  getAllProblems,
+  getCurrentStreak,
+  getNextReview,
   getProblemProgressKey,
   getProblemProgress,
   getTodayString,
-  pageSizeOptions,
 } from "../lib/tracker";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+
+const difficultyBar = { Easy: "bg-easy", Medium: "bg-medium", Hard: "bg-hard" };
+
+const countSolved = (problems, progress) =>
+  problems.filter((problem) => progress[getProblemProgressKey(problem)]?.solved)
+    .length;
 
 const LeetCodeTracker = () => {
   const { trackerState, updateTrackerState, mounted } = useTracker();
@@ -30,18 +38,20 @@ const LeetCodeTracker = () => {
   const [filterDifficulty, setFilterDifficulty] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [undo, setUndo] = useState(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
 
-  const { progress, customProblems, uiPreferences } = trackerState || {
-    progress: {},
-    customProblems: [],
-    uiPreferences: {
-      pageSize: 20,
-      selectedList: "Blind 75",
-      showOnlyDueToday: false,
-    },
-  };
+  const { progress, customProblems, uiPreferences, activityLog } =
+    trackerState || {
+      progress: {},
+      customProblems: [],
+      activityLog: [],
+      uiPreferences: {
+        pageSize: 20,
+        selectedList: "Blind 75",
+        showOnlyDueToday: false,
+      },
+    };
 
   const problemLists = useMemo(
     () => ({
@@ -65,7 +75,15 @@ const LeetCodeTracker = () => {
   }, []);
 
   useEffect(() => {
-    setCurrentPage(1);
+    if (!undo) return;
+    const timeoutId = window.setTimeout(() => setUndo(null), 6000);
+    return () => window.clearTimeout(timeoutId);
+  }, [undo]);
+
+  useEffect(() => {
+    document
+      .querySelector('[role="tab"][aria-selected="true"]')
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
     setSearchQuery("");
     setFilterCategory("All");
     setFilterDifficulty("All");
@@ -102,6 +120,44 @@ const LeetCodeTracker = () => {
   }, [activeSelectedList, currentProgress, problemLists]);
   const today = useMemo(() => getTodayString(), []);
 
+  const reviewQueue = useMemo(
+    () =>
+      getAllProblems(customProblems)
+        .map((problem) => ({
+          problem,
+          next: getNextReview(currentProgress[getProblemProgressKey(problem)], today),
+        }))
+        .filter(({ next }) => next && next.state !== "upcoming")
+        .sort((left, right) => left.next.daysAway - right.next.daysAway),
+    [customProblems, currentProgress, today],
+  );
+
+  const statusCounts = useMemo(() => {
+    const solved = countSolved(problems, currentProgress);
+    const due = problems.filter((problem) => {
+      const next = getNextReview(
+        currentProgress[getProblemProgressKey(problem)],
+        today,
+      );
+      return next && next.state !== "upcoming";
+    }).length;
+    return { solved, unsolved: problems.length - solved, due };
+  }, [problems, currentProgress, today]);
+
+  const difficultyStats = ["Easy", "Medium", "Hard"].map((difficulty) => {
+    const ofDifficulty = problems.filter((p) => p.difficulty === difficulty);
+    return {
+      difficulty,
+      total: ofDifficulty.length,
+      solved: countSolved(ofDifficulty, currentProgress),
+    };
+  });
+  const completion = problems.length
+    ? Math.round((statusCounts.solved / problems.length) * 100)
+    : 0;
+  const streak = getCurrentStreak(activityLog, today);
+  const activeToday = activityLog.some((entry) => entry.date === today);
+
   const categories = useMemo(
     () => [
       "All",
@@ -121,8 +177,6 @@ const LeetCodeTracker = () => {
     ],
     [problems],
   );
-
-  const difficulties = ["All", "Easy", "Medium", "Hard"];
 
   const filteredProblems = useMemo(
     () =>
@@ -158,11 +212,8 @@ const LeetCodeTracker = () => {
         }
 
         if (filterStatus === "Due Today") {
-          if (!isSolved) return false;
-          const nextReviews = calculateNextReviews(prob.solvedDate);
-          return nextReviews.some(
-            (date, idx) => !prob.reviews?.[idx] && date <= today,
-          );
+          const next = getNextReview(prob, today);
+          return Boolean(next) && next.state !== "upcoming";
         }
 
         return true;
@@ -177,20 +228,6 @@ const LeetCodeTracker = () => {
       filterStatus,
     ],
   );
-
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredProblems.length / uiPreferences.pageSize),
-  );
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-  const paginatedProblems = useMemo(() => {
-    const startIndex = (safeCurrentPage - 1) * uiPreferences.pageSize;
-    return filteredProblems.slice(
-      startIndex,
-      startIndex + uiPreferences.pageSize,
-    );
-  }, [filteredProblems, safeCurrentPage, uiPreferences.pageSize]);
-  const rowStart = (safeCurrentPage - 1) * uiPreferences.pageSize;
 
   const toggleComplete = useCallback(
     (problem, reviewIndex = null) => {
@@ -295,149 +332,249 @@ const LeetCodeTracker = () => {
     [updateTrackerState, activeSelectedList, today],
   );
 
+  // Every tracking action goes through here so it can be undone from the toast.
+  const track = useCallback(
+    (problem, reviewIndex = null) => {
+      const status = trackerState.progress[getProblemProgressKey(problem)];
+      const label =
+        reviewIndex === null
+          ? status?.solved
+            ? "Marked unsolved"
+            : "Solved"
+          : status?.reviews?.[reviewIndex]
+            ? `Review ${reviewIndex + 1} unmarked`
+            : `Review ${reviewIndex + 1} done`;
+      setUndo({ label, title: problem.title, snapshot: trackerState });
+      toggleComplete(problem, reviewIndex);
+    },
+    [toggleComplete, trackerState],
+  );
+
   const handleAddCustomProblem = useCallback(
-    (problem) => {
+    (problem, { markSolved = false } = {}) => {
       const exists = trackerState.customProblems.some(
         (item) =>
           (item.slug && item.slug === problem.slug) || item.url === problem.url,
       );
+      const alreadySolved =
+        trackerState.progress[getProblemProgressKey(problem)]?.solved;
 
-      if (exists) {
-        return { ok: false, error: "This problem is already being tracked." };
-      }
-
+      setUndo({
+        label: exists ? "Already tracked" : "Added",
+        title: problem.title,
+        snapshot: trackerState,
+      });
       updateTrackerState((prev) => ({
         ...prev,
-        customProblems: [...prev.customProblems, problem],
+        customProblems: exists
+          ? prev.customProblems
+          : [...prev.customProblems, problem],
         uiPreferences: {
           ...prev.uiPreferences,
           selectedList: CUSTOM_TRACKING_LIST,
         },
       }));
+      if (markSolved && !alreadySolved) {
+        toggleComplete(problem);
+      }
       return { ok: true };
     },
-    [trackerState, updateTrackerState],
+    [toggleComplete, trackerState, updateTrackerState],
   );
 
-  const prepareCustomTrackingList = useCallback(() => {
+  const selectList = (listName) =>
     updateTrackerState((prev) => ({
       ...prev,
-      uiPreferences: {
-        ...prev.uiPreferences,
-        selectedList: CUSTOM_TRACKING_LIST,
-      },
+      uiPreferences: { ...prev.uiPreferences, selectedList: listName },
     }));
-  }, [updateTrackerState]);
 
   if (!mounted || !trackerState)
     return (
-      <div className="min-h-[calc(100vh-65px)] animate-pulse bg-background px-3 pt-4 pb-4">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-3">
-          <div className="h-24 rounded-xl bg-secondary/30" />
-          <div className="h-12 rounded-xl bg-secondary/20" />
-          <div className="h-96 rounded-xl bg-secondary/20" />
-        </div>
+      <div className="mx-auto flex w-full max-w-5xl animate-pulse flex-col gap-4 px-4 py-6">
+        <div className="h-9 w-2/3 rounded-lg bg-muted" />
+        <div className="h-20 rounded-xl bg-muted/60" />
+        <div className="h-96 rounded-xl bg-muted/40" />
       </div>
     );
 
   return (
-    <div className="min-h-[calc(100vh-65px)] bg-linear-to-b from-background via-background to-secondary/10 px-3 pt-4 pb-4 transition-colors">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3">
-        <Card className="border-border/70 bg-card/95 shadow-sm">
-          <CardHeader className="gap-4 border-b border-border/70 bg-secondary/20">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div className="space-y-1">
-                <CardTitle>Problems</CardTitle>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <CustomSetManager
-                  onAddProblem={handleAddCustomProblem}
-                  selectedList={activeSelectedList}
-                  onPrepareList={prepareCustomTrackingList}
-                />
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="gap-2 border border-border/70 shadow-sm"
-                        aria-label="Review Info"
-                      >
-                        <Info size={14} />
-                      </Button>
-                    }
-                  />
-                  <TooltipContent className="max-w-xs text-pretty leading-relaxed">
-                    <div className="gap-1 text-xs text-background">
-                      Solve a problem once, then revisit it after 1, 3, 7, 14,
-                      and 30 days. Reviews due today are highlighted, and
-                      reminders can notify you when your streak or review queue
-                      needs attention.
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 px-4 pt-3 pb-4">
-            <Filters
-              searchQuery={searchQuery}
-              setSearchQuery={(value) => {
-                setSearchQuery(value);
-                setCurrentPage(1);
-              }}
-              categories={categories}
-              difficulties={difficulties}
-              filterCategory={filterCategory}
-              setFilterCategory={(value) => {
-                setFilterCategory(value);
-                setCurrentPage(1);
-              }}
-              filterDifficulty={filterDifficulty}
-              setFilterDifficulty={(value) => {
-                setFilterDifficulty(value);
-                setCurrentPage(1);
-              }}
-              filterStatus={filterStatus}
-              setFilterStatus={(value) => {
-                setFilterStatus(value);
-                setCurrentPage(1);
-              }}
-              pageSize={uiPreferences.pageSize}
-              setPageSize={(pageSize) => {
-                setCurrentPage(1);
-                updateTrackerState((prev) => ({
-                  ...prev,
-                  uiPreferences: { ...prev.uiPreferences, pageSize },
-                }));
-              }}
-              pageSizeOptions={pageSizeOptions}
-              showPageSizeControl={filteredProblems.length > 20}
-            />
-
-            {/* Review Info now in tooltip */}
-
-            <ProblemTable
-              problems={paginatedProblems}
-              progress={currentProgress}
-              toggleComplete={toggleComplete}
-              onCategoryClick={(category) => {
-                setFilterCategory(category);
-                setCurrentPage(1);
-              }}
-              calculateNextReviews={calculateNextReviews}
-              currentPage={safeCurrentPage}
-              rowStart={rowStart}
-              totalPages={totalPages}
-              totalItems={filteredProblems.length}
-              onPageChange={(page) =>
-                setCurrentPage(Math.max(1, Math.min(page, totalPages)))
-              }
-            />
-          </CardContent>
-        </Card>
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-6">
+      <div className="flex items-center gap-2">
+        <div
+          role="tablist"
+          aria-label="Problem list"
+          className="no-scrollbar flex min-w-0 flex-1 gap-1 overflow-x-auto"
+        >
+          {availableLists.map((listName) => {
+            const listProblems = problemLists[listName];
+            const selected = listName === activeSelectedList;
+            return (
+              <button
+                key={listName}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                onClick={() => selectList(listName)}
+                className={cn(
+                  "flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/60",
+                  selected && "bg-muted text-foreground",
+                )}
+              >
+                {listName === CUSTOM_TRACKING_LIST ? "My problems" : listName}
+                <span className="text-xs tabular-nums text-muted-foreground">
+                  {countSolved(listProblems, currentProgress)}/
+                  {listProblems.length}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <CustomSetManager onAddProblem={handleAddCustomProblem} />
       </div>
+
+      <section
+        aria-label="Progress"
+        className="grid gap-4 rounded-xl border border-border bg-card p-4 sm:grid-cols-[1fr_auto] sm:items-end"
+      >
+        <div className="flex flex-col gap-3">
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-semibold tabular-nums">
+              {statusCounts.solved}
+            </span>
+            <span className="text-sm text-muted-foreground tabular-nums">
+              / {problems.length} solved · {completion}%
+            </span>
+          </div>
+          <div
+            className="flex h-2 overflow-hidden rounded-full bg-muted"
+            role="img"
+            aria-label={`${completion}% solved`}
+          >
+            {difficultyStats.map(({ difficulty, solved }) => (
+              <div
+                key={difficulty}
+                className={cn("h-full", difficultyBar[difficulty])}
+                style={{
+                  width: `${problems.length ? (solved / problems.length) * 100 : 0}%`,
+                }}
+              />
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            {difficultyStats.map(({ difficulty, solved, total }) => (
+              <span key={difficulty} className="flex items-center gap-1.5">
+                <span
+                  className={cn("size-2 rounded-full", difficultyBar[difficulty])}
+                />
+                {difficulty}
+                <span className="tabular-nums text-foreground">
+                  {solved}/{total}
+                </span>
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <div
+            className={cn(
+              "flex items-center gap-2 rounded-lg bg-muted px-3 py-2",
+              activeToday ? "text-primary" : "text-muted-foreground",
+            )}
+            title={
+              activeToday
+                ? "You studied today"
+                : "Solve or review one problem to keep your streak"
+            }
+          >
+            <Flame className="size-4" />
+            <span className="text-sm font-semibold tabular-nums">{streak}</span>
+            <span className="text-xs">day streak</span>
+          </div>
+          <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-muted-foreground">
+            <Repeat
+              className={cn("size-4", reviewQueue.length && "text-warning")}
+            />
+            <span className="text-sm font-semibold tabular-nums text-foreground">
+              {reviewQueue.length}
+            </span>
+            <span className="text-xs">due</span>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <button
+                    type="button"
+                    aria-label="How reviews work"
+                    className="rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/60"
+                  />
+                }
+              >
+                <Info className="size-3.5" />
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs text-pretty">
+                Solve a problem once, then revisit it after 1, 3, 7, 14 and 30
+                days. Each dot in a row is one review — click it to toggle.
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
+      </section>
+
+      <ReviewQueue items={reviewQueue} onReview={track} />
+
+      <section
+        aria-label="Problems"
+        className="overflow-hidden rounded-xl border border-border bg-card"
+      >
+        <div className="border-b border-border p-3 sm:px-4">
+          <Filters
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            categories={categories}
+            filterCategory={filterCategory}
+            setFilterCategory={setFilterCategory}
+            filterDifficulty={filterDifficulty}
+            setFilterDifficulty={setFilterDifficulty}
+            filterStatus={filterStatus}
+            setFilterStatus={setFilterStatus}
+            statusCounts={statusCounts}
+          />
+        </div>
+        <ProblemTable
+          problems={filteredProblems}
+          progress={currentProgress}
+          today={today}
+          toggleComplete={track}
+          onCategoryClick={setFilterCategory}
+          emptyMessage={
+            problems.length
+              ? "No problems match these filters."
+              : "No problems yet. Use “Add problem” and paste a LeetCode link."
+          }
+        />
+      </section>
+
+      {undo ? (
+        <div
+          role="status"
+          className="fixed bottom-6 left-1/2 z-30 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full border border-border bg-popover py-1.5 pr-1.5 pl-4 text-sm text-popover-foreground shadow-lg"
+        >
+          <span className="truncate">
+            <span className="font-medium">{undo.label}</span>
+            <span className="text-muted-foreground"> · {undo.title}</span>
+          </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="rounded-full"
+            onClick={() => {
+              updateTrackerState(undo.snapshot);
+              setUndo(null);
+            }}
+          >
+            Undo
+          </Button>
+        </div>
+      ) : null}
       <BackToTopButton visible={showBackToTop} />
     </div>
   );

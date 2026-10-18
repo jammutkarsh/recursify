@@ -1,299 +1,230 @@
 import { memo } from "react";
+import { Check, CheckCheck, ExternalLink, NotebookPen } from "lucide-react";
 import {
-  CheckCircle2,
-  Circle,
-  Calendar,
-  ExternalLink,
-  ChevronLeft,
-  ChevronRight,
-  NotebookPen,
-} from "lucide-react";
-import {
+  calculateNextReviews,
+  getNextReview,
   getProblemIdentifier,
   getProblemProgressKey,
-  getTodayString,
 } from "../lib/tracker";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
-const difficultyColor = {
-  Easy: "text-green-600",
-  Medium: "text-yellow-600",
-  Hard: "text-red-600",
+export const difficultyText = {
+  Easy: "text-easy",
+  Medium: "text-medium",
+  Hard: "text-hard",
 };
 
-const formatDate = (dateString) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString(undefined, {
+export const formatDate = (dateString: string) =>
+  new Date(`${dateString}T00:00:00`).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
   });
+
+export const describeNextReview = (next) => {
+  if (next.state === "today") return "due today";
+  if (next.state === "overdue") return `${-next.daysAway}d late`;
+  return `in ${next.daysAway}d`;
 };
 
-const isOverdue = (date: string, today: string) => date < today;
-const isDueToday = (date: string, today: string) => date === today;
+const ReviewCell = ({ problem, status, today, toggleComplete }) => {
+  if (!status.solved) {
+    return <span className="hidden text-xs text-muted-foreground sm:block">—</span>;
+  }
+
+  const dates = calculateNextReviews(status.solvedDate);
+  const next = getNextReview(status, today);
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex items-center" role="group" aria-label="Reviews">
+        {dates.map((date, idx) => {
+          const done = Boolean(status.reviews?.[idx]);
+          const tone = done
+            ? "bg-success"
+            : date < today
+              ? "bg-hard"
+              : date === today
+                ? "bg-warning"
+                : "border border-muted-foreground/40";
+          const label = `Review ${idx + 1} · ${formatDate(date)}${done ? " · done" : ""}`;
+          return (
+            <button
+              key={idx}
+              type="button"
+              aria-pressed={done}
+              aria-label={label}
+              title={label}
+              onClick={() => toggleComplete(problem, idx)}
+              className="group/dot flex size-5 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+            >
+              <span
+                className={cn(
+                  "size-2 rounded-full transition-transform group-hover/dot:scale-150",
+                  tone,
+                )}
+              />
+            </button>
+          );
+        })}
+      </div>
+
+      {!next ? (
+        <span className="flex items-center gap-1 text-xs font-medium text-success">
+          <CheckCheck className="size-3.5" />
+          All reviewed
+        </span>
+      ) : next.state === "upcoming" ? (
+        <span
+          className="text-xs text-muted-foreground tabular-nums"
+          title={formatDate(next.date)}
+        >
+          R{next.index + 1} {describeNextReview(next)}
+        </span>
+      ) : (
+        <Button
+          size="xs"
+          variant="outline"
+          onClick={() => toggleComplete(problem, next.index)}
+          className={cn(
+            "tabular-nums",
+            next.state === "overdue"
+              ? "border-hard/40 text-hard hover:text-hard"
+              : "border-warning/50 text-warning hover:text-warning",
+          )}
+          title={`Mark review ${next.index + 1} done`}
+        >
+          <Check />R{next.index + 1} {describeNextReview(next)}
+        </Button>
+      )}
+    </div>
+  );
+};
 
 interface ProblemTableProps {
   problems: any[];
   progress: Record<string, any>;
+  today: string;
   toggleComplete: (problem: any, reviewIndex?: number | null) => void;
   onCategoryClick?: (category: string) => void;
-  calculateNextReviews: (solvedDate: string) => string[];
-  currentPage: number;
-  rowStart: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
-  totalItems: number;
+  emptyMessage: string;
 }
 
 const ProblemTable = memo(function ProblemTable({
   problems,
   progress,
+  today,
   toggleComplete,
   onCategoryClick,
-  calculateNextReviews,
-  currentPage,
-  rowStart,
-  totalPages,
-  onPageChange,
-  totalItems,
+  emptyMessage,
 }: ProblemTableProps) {
-  const today = getTodayString();
+  if (!problems.length) {
+    return (
+      <p className="px-4 py-16 text-center text-sm text-muted-foreground">
+        {emptyMessage}
+      </p>
+    );
+  }
 
-  const content = (
-    <>
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-16">#</TableHead>
-              <TableHead className="min-w-56">Name</TableHead>
-              <TableHead className="w-36">Category</TableHead>
-              <TableHead className="w-24">Difficulty</TableHead>
-              {/* Removed Companies column */}
-              <TableHead className="w-28">Status</TableHead>
-              <TableHead className="min-w-80">
-                Reviews &amp; Due Dates
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {problems.map((problem, index) => {
-              const problemId = getProblemIdentifier(problem);
-              const prob = progress[getProblemProgressKey(problem)] || {};
-              const nextReviews = calculateNextReviews(prob.solvedDate);
-              const rawSection =
-                problem.listMeta?.section || problem.listMeta?.module;
-              const sectionLabel: string | undefined =
-                rawSection != null ? String(rawSection) : undefined;
-              const dedupeTopics = [...new Set<string>(problem.topics || [])];
-              const showSection =
-                sectionLabel != null && !dedupeTopics.includes(sectionLabel);
-              return (
-                <TableRow key={problemId}>
-                  <TableCell className="text-sm tabular-nums">
-                    {rowStart + index + 1}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    <div className="flex items-center gap-2">
-                      <a
-                        href={problem.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary underline-offset-4 hover:underline flex items-center gap-1"
-                        title={`Open ${problem.title} on LeetCode`}
-                      >
-                        <span className="line-clamp-2">{problem.title}</span>
-                        <ExternalLink size={14} className="shrink-0" />
-                      </a>
-                      {problem.notes ? (
-                        <Tooltip>
-                          <TooltipTrigger
-                            render={
-                              <span className="text-muted-foreground cursor-default" />
-                            }
-                          >
-                            <NotebookPen size={14} />
-                          </TooltipTrigger>
-                          <TooltipContent>{problem.notes}</TooltipContent>
-                        </Tooltip>
-                      ) : null}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex max-w-40 flex-wrap gap-1.5">
-                      {showSection ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onCategoryClick?.(sectionLabel as string)
-                          }
-                          className="rounded-full"
-                        >
-                          <Badge
-                            variant="outline"
-                            className="cursor-pointer transition-colors hover:bg-secondary"
-                          >
-                            {sectionLabel as string}
-                          </Badge>
-                        </button>
-                      ) : null}
-                      {dedupeTopics.map((topic, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => onCategoryClick?.(topic)}
-                          className="rounded-full"
-                        >
-                          <Badge
-                            variant="outline"
-                            className="cursor-pointer transition-colors hover:bg-secondary"
-                          >
-                            {topic}
-                          </Badge>
-                        </button>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`text-sm font-semibold ${difficultyColor[problem.difficulty]}`}
-                    >
-                      {problem.difficulty}
-                    </span>
-                  </TableCell>
-                  {/* Removed Companies column cell */}
-                  <TableCell>
-                    <Button
-                      onClick={() => toggleComplete(problem)}
-                      variant="ghost"
-                      size="sm"
-                      className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-                    >
-                      {prob.solved ? (
-                        <CheckCircle2
-                          className="text-green-600 dark:text-green-500"
-                          size={20}
-                        />
-                      ) : (
-                        <Circle size={20} />
-                      )}
-                      <span className="text-xs">
-                        {prob.solved ? "Solved" : "Not Solved"}
-                      </span>
-                    </Button>
-                  </TableCell>
-                  <TableCell>
-                    {prob.solved ? (
-                      <div className="grid min-w-80 grid-cols-5 gap-2">
-                        {nextReviews.map((date, idx) => {
-                          const isCompleted = prob.reviews?.[idx];
-                          const overdue =
-                            !isCompleted && isOverdue(date, today);
-                          const dueToday =
-                            !isCompleted && isDueToday(date, today);
+  return (
+    <ul className="divide-y divide-border">
+      {problems.map((problem) => {
+        const status = progress[getProblemProgressKey(problem)] || {};
+        const section = problem.listMeta?.section || problem.listMeta?.module;
+        const tags = [...new Set<string>([section, ...(problem.topics || [])])]
+          .filter(Boolean)
+          .map(String);
 
-                          return (
-                            <div
-                              key={idx}
-                              className="flex min-w-0 flex-col items-center"
-                            >
-                              <Button
-                                onClick={() => toggleComplete(problem, idx)}
-                                size="xs"
-                                variant={
-                                  isCompleted
-                                    ? "secondary"
-                                    : overdue
-                                      ? "destructive"
-                                      : dueToday
-                                        ? "outline"
-                                        : "ghost"
-                                }
-                                className={`w-full min-w-0 ${dueToday && !isCompleted ? "border-yellow-500 text-yellow-700 dark:text-yellow-400" : ""}`}
-                                title={`Review ${idx + 1} - Due: ${formatDate(date)}`}
-                              >
-                                {`R${idx + 1}`}
-                              </Button>
-                              <div
-                                className={`mt-1 flex items-center gap-0.5 tabular-nums text-[10px] ${
-                                  isCompleted
-                                    ? "text-green-600 dark:text-green-400"
-                                    : overdue
-                                      ? "text-red-600 dark:text-red-400"
-                                      : dueToday
-                                        ? "text-yellow-600 dark:text-yellow-400"
-                                        : "text-muted-foreground"
-                                }`}
-                              >
-                                <Calendar size={10} />
-                                {formatDate(date)}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">
-                        Complete problem to see review schedule
-                      </span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-muted-foreground">
-          {totalItems} problem{totalItems === 1 ? "" : "s"} total
-        </p>
-        {totalItems > 20 ? (
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => onPageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              variant="outline"
-              size="sm"
-              className="gap-1"
+        return (
+          <li
+            key={getProblemIdentifier(problem)}
+            className="group grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5 px-3 py-2.5 transition-colors hover:bg-muted/40 sm:grid-cols-[auto_minmax(0,1fr)_4.5rem_15rem] sm:px-4"
+          >
+            <button
+              type="button"
+              onClick={() => toggleComplete(problem)}
+              aria-pressed={Boolean(status.solved)}
+              aria-label={
+                status.solved
+                  ? `Mark ${problem.title} unsolved`
+                  : `Mark ${problem.title} solved`
+              }
+              className={cn(
+                "flex size-5 items-center justify-center rounded-full border-2 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+                status.solved
+                  ? "border-success bg-success text-background"
+                  : "border-muted-foreground/40 text-transparent hover:border-success hover:text-success",
+              )}
             >
-              <ChevronLeft size={16} />
-              Prev
-            </Button>
-            <span className="text-sm text-muted-foreground">
-              Page {currentPage} of {totalPages || 1}
-            </span>
-            <Button
-              onClick={() => onPageChange(currentPage + 1)}
-              disabled={currentPage >= totalPages}
-              variant="outline"
-              size="sm"
-              className="gap-1"
-            >
-              Next
-              <ChevronRight size={16} />
-            </Button>
-          </div>
-        ) : null}
-      </div>
-    </>
+              <Check className="size-3" strokeWidth={3.5} />
+            </button>
+
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <a
+                  href={problem.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="truncate text-sm font-medium text-foreground underline-offset-4 hover:underline"
+                >
+                  {problem.title}
+                </a>
+                <ExternalLink className="size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                {problem.notes ? (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <span className="cursor-default text-muted-foreground" />
+                      }
+                    >
+                      <NotebookPen className="size-3.5" />
+                    </TooltipTrigger>
+                    <TooltipContent>{problem.notes}</TooltipContent>
+                  </Tooltip>
+                ) : null}
+              </div>
+              {tags.length ? (
+                <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-muted-foreground">
+                  {tags.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => onCategoryClick?.(tag)}
+                      className="rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/60"
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="col-start-2 flex items-center gap-4 sm:contents">
+              <span
+                className={cn(
+                  "text-xs font-medium",
+                  difficultyText[problem.difficulty],
+                )}
+              >
+                {problem.difficulty}
+              </span>
+              <ReviewCell
+                problem={problem}
+                status={status}
+                today={today}
+                toggleComplete={toggleComplete}
+              />
+            </div>
+          </li>
+        );
+      })}
+    </ul>
   );
-
-  return <div className="min-w-0">{content}</div>;
 });
 
 export default ProblemTable;

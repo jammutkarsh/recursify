@@ -10,7 +10,8 @@ const BackToTopButton = ({ visible }) => {
     <Button
       onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
       size="icon"
-      className="fixed bottom-6 right-6 z-20 size-12 rounded-full shadow-lg"
+      variant="outline"
+      className="fixed right-6 bottom-6 z-20 size-10 rounded-full bg-popover shadow-lg"
       aria-label="Back to top"
     >
       <ArrowUp />

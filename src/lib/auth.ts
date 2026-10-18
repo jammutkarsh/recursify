@@ -1,21 +1,21 @@
-import { SignJWT, jwtVerify } from "jose";
+import { env } from "cloudflare:workers";
+import { cookies } from "next/headers";
 
-export const JWT_SECRET = process.env.JWT_SECRET || "default_secret_change_me_in_production";
-const key = new TextEncoder().encode(JWT_SECRET);
+export const TOKEN_COOKIE = "site_token";
 
-export async function signToken(username: string) {
-  return await new SignJWT({ username })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime("30d")
-    .sign(key);
+const sha256 = async (value: string) =>
+  new Uint8Array(
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)),
+  );
+
+// Compare fixed-length hashes without early exit so timing leaks nothing.
+export async function isValidToken(token: string | undefined) {
+  if (!env.SITE_TOKEN || !token) return false;
+  const [a, b] = await Promise.all([sha256(token), sha256(env.SITE_TOKEN)]);
+  return a.reduce((diff, byte, i) => diff | (byte ^ b[i]), 0) === 0;
 }
 
-export async function verifyToken(token: string) {
-  try {
-    const { payload } = await jwtVerify(token, key);
-    return payload;
-  } catch {
-    return null;
-  }
+export async function isSignedIn() {
+  const store = await cookies();
+  return isValidToken(store.get(TOKEN_COOKIE)?.value);
 }

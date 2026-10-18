@@ -551,6 +551,43 @@ export const getDueReviewCount = (
     );
   }).length;
 
+// First review not yet done, with its urgency relative to today.
+export const getNextReview = (status, today = getTodayString()) => {
+  if (!status?.solved) {
+    return null;
+  }
+
+  const dates = calculateNextReviews(status.solvedDate);
+  const index = dates.findIndex((_, idx) => !status.reviews?.[idx]);
+  if (index === -1) {
+    return null;
+  }
+
+  const date = dates[index];
+  const daysAway = Math.round(
+    (parseDateString(date).getTime() - parseDateString(today).getTime()) /
+      (24 * 60 * 60 * 1000),
+  );
+  return {
+    index,
+    date,
+    daysAway,
+    state: daysAway < 0 ? "overdue" : daysAway === 0 ? "today" : "upcoming",
+  };
+};
+
+// Every known problem across built-in and custom lists, deduped by progress key.
+export const getAllProblems = (customProblems = []) => {
+  const seen = new Set();
+  return [...Object.values(builtinProblemLists).flat(), ...customProblems]
+    .filter((problem) => {
+      const key = getProblemProgressKey(problem);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+};
+
 export const getActivityDates = (activityLog) =>
   Array.from(
     new Set(

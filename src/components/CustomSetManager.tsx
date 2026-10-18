@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertCircle, BookPlus, Link as LinkIcon, Plus } from "lucide-react";
+import { AlertCircle, Link as LinkIcon, Loader2, Plus } from "lucide-react";
 import {
   buildCustomProblem,
   fetchProblemDetails,
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -35,13 +36,14 @@ const fallbackDefaults = {
 
 const DUPLICATE_PROBLEM_ERROR = "This problem is already being tracked.";
 
-const CustomSetManager = ({ onAddProblem, selectedList, onPrepareList }) => {
+const CustomSetManager = ({ onAddProblem }) => {
   const [problemUrl, setProblemUrl] = useState("");
   const [error, setError] = useState("");
   const [isFetchingMetadata, setIsFetchingMetadata] = useState(false);
   const [fallbackProblem, setFallbackProblem] = useState(null);
   const [fallbackForm, setFallbackForm] = useState(fallbackDefaults);
   const [open, setOpen] = useState(false);
+  const [markSolved, setMarkSolved] = useState(true);
 
   const resetForm = () => {
     setProblemUrl("");
@@ -77,7 +79,7 @@ const CustomSetManager = ({ onAddProblem, selectedList, onPrepareList }) => {
         return;
       }
 
-      const result = onAddProblem(apiProblem);
+      const result = onAddProblem(apiProblem, { markSolved });
       if (!result.ok) {
         if (result.error === DUPLICATE_PROBLEM_ERROR) {
           resetForm();
@@ -131,13 +133,16 @@ const CustomSetManager = ({ onAddProblem, selectedList, onPrepareList }) => {
       return;
     }
 
-    const result = onAddProblem({
-      ...fallbackProblem,
-      title: fallbackForm.title.trim(),
-      difficulty: fallbackForm.difficulty,
-      topics,
-      companies: fallbackProblem.companies || [],
-    });
+    const result = onAddProblem(
+      {
+        ...fallbackProblem,
+        title: fallbackForm.title.trim(),
+        difficulty: fallbackForm.difficulty,
+        topics,
+        companies: fallbackProblem.companies || [],
+      },
+      { markSolved },
+    );
     if (!result.ok) {
       if (result.error === DUPLICATE_PROBLEM_ERROR) {
         resetForm();
@@ -152,39 +157,27 @@ const CustomSetManager = ({ onAddProblem, selectedList, onPrepareList }) => {
     setOpen(false);
   };
 
-  const isSelected = selectedList === "Custom Tracking";
-
   return (
     <Dialog
       open={open}
       onOpenChange={(val) => {
-        if (val && !isSelected) {
-          onPrepareList?.();
-        }
         setOpen(val);
         if (!val) resetForm();
       }}
     >
       <DialogTrigger
         render={
-          <Button variant="default" size="sm" className="gap-1 shadow-sm">
-            <Plus size={16} />
-            Add Problem
+          <Button className="h-9 shrink-0 px-3">
+            <Plus />
+            <span className="hidden sm:inline">Add problem</span>
           </Button>
         }
       />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <BookPlus
-              size={20}
-              className="text-orange-600 dark:text-orange-400"
-            />
-            Add Problem
-          </DialogTitle>
+          <DialogTitle>Add problem</DialogTitle>
           <DialogDescription>
-            Add a LeetCode problem by URL. Problems are saved to your custom
-            tracking list automatically.
+            Paste a LeetCode link and press Enter. It lands in My problems.
           </DialogDescription>
         </DialogHeader>
 
@@ -201,10 +194,27 @@ const CustomSetManager = ({ onAddProblem, selectedList, onPrepareList }) => {
                 value={problemUrl}
                 onChange={(event) => setProblemUrl(event.target.value)}
                 placeholder="https://leetcode.com/problems/two-sum/"
-                className="pl-9"
+                className="h-9 pl-9"
+                autoFocus
+                disabled={isFetchingMetadata}
               />
+              {isFetchingMetadata ? (
+                <Loader2
+                  size={16}
+                  aria-label="Fetching problem data"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-muted-foreground"
+                />
+              ) : null}
             </div>
           </div>
+
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={markSolved}
+              onCheckedChange={(checked) => setMarkSolved(Boolean(checked))}
+            />
+            I solved it today — start the review schedule
+          </label>
 
           {error ? (
             <p className="text-sm text-destructive flex items-center gap-2">
@@ -213,11 +223,6 @@ const CustomSetManager = ({ onAddProblem, selectedList, onPrepareList }) => {
             </p>
           ) : null}
 
-          {isFetchingMetadata ? (
-            <p className="text-sm text-muted-foreground">
-              Fetching problem data...
-            </p>
-          ) : null}
         </form>
 
         {fallbackProblem ? (

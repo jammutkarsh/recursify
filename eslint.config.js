@@ -8,10 +8,11 @@ export default tseslint.config(
   {
     ignores: [
       ".next/**",
+      ".cloudflare/**",
+      ".vinext/**",
       "dist/**",
       "node_modules/**",
       "public/sw.js",
-      ".open-next/**",
     ],
   },
   js.configs.recommended,

@@ -132,13 +132,13 @@ const ReminderButton = ({ settings, onSettingsChange, onEnableChange }) => {
     <div className="relative" ref={dropdownRef}>
       <Button
         onClick={() => setIsOpen(!isOpen)}
-        variant={settings.enabled ? "secondary" : "outline"}
+        variant="ghost"
         size="icon"
-        className="border border-border/80 bg-background/90 shadow-sm"
         aria-label="Toggle reminders"
+        aria-expanded={isOpen}
       >
         {settings.enabled ? (
-          <BellRing className="text-amber-600 dark:text-amber-400" />
+          <BellRing className="text-primary" />
         ) : (
           <Bell />
         )}
