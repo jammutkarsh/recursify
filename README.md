@@ -17,7 +17,7 @@ You need a GitHub account and a free Cloudflare account.
 1. **Fork** this repository.
 2. In the [Cloudflare dashboard](https://dash.cloudflare.com/?to=/:account/workers-and-pages), go to **Workers & Pages → Create → Import a repository** and pick your fork.
 3. Use these settings:
-   - Project name: `leetcode-tracker` (must match `name` in `cloudflare.config.ts`)
+   - Project name: `recursify` (must match `name` in `cloudflare.config.ts`)
    - Build command: _leave empty_
    - Deploy command: `bun run deploy` (runs `cf deploy`; not `npx wrangler deploy`, which rejects this build output)
 4. Click **Deploy**. The D1 database is created on the first deploy, and the app creates its own tables on first use.

@@ -2,7 +2,7 @@ import { bindings, defineConfig, defineWorker } from "cf/config";
 
 export default defineConfig(({ mode }) => ({
   worker: defineWorker({
-    name: "leetcode-tracker",
+    name: "recursify",
     entrypoint: "vinext/server/fetch-handler",
     compatibilityDate: "2026-10-18",
     compatibilityFlags: ["nodejs_compat"],
