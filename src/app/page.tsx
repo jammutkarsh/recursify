@@ -1,77 +1,114 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Flame, Repeat, ListChecks, Cloud } from "lucide-react";
-import { isSignedIn } from "@/lib/auth";
+import { LogoMark } from "@/components/app/AppShell";
+import { HomePolygon } from "@/components/app/HomePolygon";
+import { isPublicSite, isSignedIn } from "@/lib/auth";
 
-const REPO_URL = "https://github.com/jammutkarsh/leetcode-tracker";
+// Copy is verbatim from the Figma frame "Home — SEO & meta (for build)".
+const ORIGIN = "https://recursify.utkarshchourasia.in";
+const TITLE = "Recursify: LeetCode Tracker with Spaced Repetition";
+const DESCRIPTION = "Free, self-hosted LeetCode tracker that brings problems back right before you forget them. FSRS spaced repetition for NeetCode 150, Blind 75 and your own lists.";
+const REPO = "https://github.com/jammutkarsh/recursify";
+const DEPLOY_GUIDE = `${REPO}#deploy-your-own`;
+const DEMO = "https://demo.recursify.utkarshchourasia.in";
 
-const features = [
-  {
-    icon: ListChecks,
-    title: "Curated lists",
-    body: "Blind 75, LeetCode 75 and NeetCode 150 built in, plus your own custom sets.",
+export const metadata = {
+  title: { absolute: TITLE },
+  description: DESCRIPTION,
+  alternates: { canonical: `${ORIGIN}/` },
+  openGraph: {
+    type: "website", url: `${ORIGIN}/`, title: TITLE,
+    description: "Spaced repetition for LeetCode. Solve it, let it fade, recur. Self-hosted on Cloudflare.",
+    images: [{ url: `${ORIGIN}/og.png`, width: 1200, height: 630, alt: "Recursify — LeetCode tracker with spaced repetition" }],
   },
-  {
-    icon: Repeat,
-    title: "Spaced repetition",
-    body: "Solved problems come back for review at 1, 3, 7, 14 and 30 days.",
-  },
-  {
-    icon: Flame,
-    title: "Streaks & reminders",
-    body: "Keep a daily streak going with optional browser reminders.",
-  },
-  {
-    icon: Cloud,
-    title: "Your own instance",
-    body: "Fork it, deploy it to Cloudflare's free tier, and keep your data in your own account.",
-  },
-];
+  twitter: { card: "summary_large_image", creator: "@jammutkarsh" },
+};
+
+const JSON_LD = {
+  "@context": "https://schema.org", "@type": "SoftwareApplication", name: "Recursify", description: DESCRIPTION, url: `${ORIGIN}/`,
+  applicationCategory: "EducationalApplication", operatingSystem: "Web", offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  author: { "@type": "Person", name: "Utkarsh Chourasia", sameAs: ["https://x.com/jammutkarsh", "https://github.com/jammutkarsh"] },
+};
+
+const FEATURES = [
+  { title: "Topic progress at a glance", body: "One wedge per topic in your list. Greener as you solve more; hover to see what's due and what's slipping.", visual: "heat" },
+  { title: "FSRS spaced repetition", body: "The same memory model Anki uses. Four honest grades, no checkbox dots. Intervals adapt to you, not a fixed calendar.", visual: "grades" },
+  { title: "Keyboard-first LeetCode practice", body: "J / K to move, 1–4 to grade, A to log, / to search. You never need the mouse.", visual: "keys" },
+  { title: "Self-hosted on Cloudflare", body: "Fork it, import it into Cloudflare, set one secret. Data lives in your own D1; updates are one “Sync fork” click.", visual: "lists" },
+] as const;
 
 export default async function Home() {
-  if (await isSignedIn()) redirect("/tracker");
+  if (await isSignedIn()) redirect("/today");
+  // Forks and the demo open straight to sign-in; only the official site shows the marketing page.
+  if (!isPublicSite()) redirect("/login");
 
   return (
-    <main
-      id="main-content"
-      className="mx-auto flex min-h-screen max-w-3xl flex-col justify-center gap-12 px-4 py-16"
-    >
-      <section className="space-y-5">
-        <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-          <Flame className="size-5" />
-        </span>
-        <h1 className="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-          A personal LeetCode tracker you host yourself.
-        </h1>
-        <p className="max-w-xl text-lg text-muted-foreground">
-          Track what you solved, review it before you forget it, and keep your
-          streak alive. One token, one Cloudflare account, no sign-ups.
-        </p>
-        <div className="flex flex-wrap gap-3">
-          <a
-            href={REPO_URL}
-            className="inline-flex h-10 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            Fork on GitHub
-          </a>
-          <Link
-            href="/login"
-            className="inline-flex h-10 items-center rounded-lg border border-border px-4 text-sm font-medium text-foreground hover:bg-muted"
-          >
-            Sign in
-          </Link>
-        </div>
-      </section>
+    <div className="bg-card">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }} />
+      <header className="flex items-center gap-8 border-b border-border px-5 py-5 md:px-[120px]">
+        <Link href="/" className="flex items-center gap-2.5 text-lg font-bold"><LogoMark size={26} />Recursify</Link>
+        <nav className="ml-auto flex items-center gap-6 text-sm font-medium text-foreground-2">
+          <a href="#features" className="hidden sm:inline">Features</a>
+          <a href={DEPLOY_GUIDE} className="hidden sm:inline">Docs</a>
+          <a href={REPO} className="hidden sm:inline">GitHub</a>
+          <Link href="/login" className="rounded-md bg-primary px-3.5 py-2 font-semibold text-primary-foreground">Sign in</Link>
+        </nav>
+      </header>
 
-      <section className="grid gap-4 sm:grid-cols-2">
-        {features.map(({ icon: Icon, title, body }) => (
-          <div key={title} className="rounded-xl border border-border p-5">
-            <Icon className="mb-3 size-5 text-primary" />
-            <h2 className="font-medium text-foreground">{title}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{body}</p>
+      <main id="main-content">
+        <section className="flex flex-col items-center gap-10 bg-gradient-to-b from-card to-primary-tint px-5 pt-16 pb-20 lg:flex-row lg:pr-20 lg:pl-[120px]">
+          <div className="max-w-[600px] space-y-6">
+            <h1 className="text-[42px] leading-[1.08] font-bold tracking-tight md:text-[56px]">Stop re-learning LeetCode problems you already solved.</h1>
+            <p className="max-w-[560px] text-lg leading-relaxed text-foreground-2 md:text-[19px]">
+              Recursify is a free LeetCode tracker with spaced repetition. It brings each problem back right before you&rsquo;d forget it, and shows which topics are slipping.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <a href={DEPLOY_GUIDE} className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-3 text-[15px] font-semibold text-primary-foreground">Deploy your own</a>
+              <a href={DEMO} className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-5 py-3 text-[15px] font-semibold">▷ Try the demo</a>
+            </div>
           </div>
-        ))}
-      </section>
-    </main>
+          <HomePolygon />
+        </section>
+
+        <section id="features" className="space-y-10 px-5 py-24 md:px-[120px]">
+          <h2 className="text-[40px] font-bold">Features</h2>
+          <div className="grid gap-6 md:grid-cols-2">
+            {FEATURES.map((f) => (
+              <div key={f.title} className="space-y-3 rounded-2xl border border-border bg-card p-7">
+                <FeatureVisual kind={f.visual} />
+                <h3 className="text-xl font-bold">{f.title}</h3>
+                <p className="text-[15px] leading-relaxed text-foreground-2">{f.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="flex flex-col items-center gap-5 bg-primary-tint px-5 py-[88px] text-center">
+          <LogoMark size={48} />
+          <h2 className="text-[40px] font-bold">Your next review is waiting.</h2>
+          <p className="text-[17px] text-foreground-2">Fork it and deploy in about five minutes, or try the demo first.</p>
+          <div className="flex flex-wrap justify-center gap-3">
+            <a href={DEPLOY_GUIDE} className="rounded-lg bg-primary px-5 py-3 text-[15px] font-semibold text-primary-foreground">Deploy your own</a>
+            <a href={DEMO} className="rounded-lg border border-border bg-card px-5 py-3 text-[15px] font-semibold">▷ Try the demo</a>
+          </div>
+        </section>
+      </main>
+
+      <footer className="flex flex-wrap items-center gap-x-6 gap-y-2 px-5 py-7 text-[13px] text-muted-foreground md:px-[120px]">
+        <span className="flex items-center gap-2 text-sm font-semibold text-foreground"><LogoMark size={18} />Recursify</span>
+        <span>by <a href="https://x.com/jammutkarsh" className="hover:text-foreground">@jammutkarsh</a></span>
+        <span>Not affiliated with LeetCode.</span>
+        <span className="flex-1" />
+        <a href={REPO} className="hover:text-foreground">GitHub</a>
+        <a href={DEPLOY_GUIDE} className="hover:text-foreground">Docs</a>
+      </footer>
+    </div>
   );
+}
+
+function FeatureVisual({ kind }: { kind: (typeof FEATURES)[number]["visual"] }) {
+  if (kind === "heat") return <div className="flex gap-1.5">{[0, 1, 2, 3, 4].map((i) => <span key={i} className="size-[18px] rounded-[4px]" style={{ background: `var(--heat-${i})` }} />)}</div>;
+  if (kind === "grades") return <div className="flex gap-1.5">{["bg-forgot", "bg-struggled", "bg-recalled", "bg-instant"].map((c) => <span key={c} className={`size-3.5 rounded-full ${c}`} />)}</div>;
+  if (kind === "keys") return <div className="flex gap-1.5">{["J", "K", "1", "4", "A", "/"].map((k) => <kbd key={k} className="inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] border border-b-2 border-border bg-muted px-1.5 font-mono text-[11px] text-foreground-2">{k}</kbd>)}</div>;
+  return <div className="flex flex-wrap gap-1.5">{["Blind 75", "LeetCode 75", "NeetCode 150", "+ custom"].map((l) => <span key={l} className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-foreground-2">{l}</span>)}</div>;
 }

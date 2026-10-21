@@ -1,1 +1,2 @@
-SITE_TOKEN=change-me-to-a-long-random-string
+SITE_TOKEN=
+PUBLIC_SITE=false

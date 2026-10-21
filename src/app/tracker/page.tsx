@@ -1,5 +1,6 @@
-import LeetCodeTracker from "../../views/LeetCodeTracker";
+import { redirect } from "next/navigation";
 
-export default function TrackerPage() {
-  return <LeetCodeTracker />;
+// Old URL from the previous version.
+export default function Tracker() {
+  redirect("/today");
 }

@@ -1,0 +1,121 @@
+/*
+ * Recursify design tokens — light → dark mapping.
+ * Source of truth for colours. Screens are designed in light only:
+ * Figma KeyG3THsnvKLlsiMzZyn0e, page "Hi-fi" ("Today — dark" is the one reference dark screen).
+ * Build dark mode by swapping these variables, never by designing dark screens.
+ *
+ * Names follow the shadcn convention already used in src/index.css, so they drop
+ * into `@theme inline` as `--color-*`. Replace the old amber palette entirely —
+ * none of its values are reused.
+ *
+ * Fonts: Geist (UI), Geist Mono (numbers, keys, labels).
+ * Radius: 6 chips · 8 controls/buttons · 10–14 cards/modals · 24 mobile sheets.
+ */
+
+:root {
+  /* Surfaces */
+  --background: #f7f8fa;          /* app canvas */
+  --card: #ffffff;                /* cards, top bar, footer, modals, drawer */
+  --popover: #ffffff;
+  --muted: #f2f3f5;               /* key chips, segmented-control track, subtle fills */
+  --track: #e4e7eb;               /* empty part of recall bars */
+  --border: #e2e5e9;
+  --input: #e2e5e9;
+  --chart-grid: #eef0f2;
+  --scrim: rgb(13 17 23 / 0.4);   /* behind modals, drawer, sheets */
+
+  /* Text */
+  --foreground: #1f2328;          /* titles, primary text */
+  --foreground-2: #424a53;        /* secondary text */
+  --muted-foreground: #6e7781;    /* meta, captions, axis labels */
+  --icon-inactive: #8c959f;       /* mobile tab bar, idle icons */
+
+  /* Accent (iris): focus, selection, primary buttons, active nav */
+  --primary: #5b5bd6;
+  --primary-foreground: #ffffff;
+  --primary-tint: #eef0ff;        /* selected row, inline grade bar, info notes */
+  --ring: #5b5bd6;
+
+  /* Toast / tooltip (inverted surface) */
+  --toast: #1f2328;
+  --toast-foreground: #ffffff;
+  --toast-muted: #a3aab3;
+
+  /* Grades — base (border, dot, bar) / tint (button bg) / text (label on tint) */
+  --grade-forgot: #e5484d;    --grade-forgot-tint: #fff0f0;    --grade-forgot-text: #ce2c31;
+  --grade-struggled: #f76b15; --grade-struggled-tint: #fff3eb; --grade-struggled-text: #cc4e00;
+  --grade-recalled: #30a14e;  --grade-recalled-tint: #eaf7ee;  --grade-recalled-text: #1a7f37;
+  --grade-instant: #0090ff;   --grade-instant-tint: #eaf4ff;   --grade-instant-text: #0b6bcb;
+  /* Recall % reuses grades: <50 forgot · <75 struggled · ≥75 recalled.
+     Overdue dates use --grade-forgot-text. "today" due uses --difficulty-medium. */
+
+  /* Difficulty (text only) */
+  --difficulty-easy: #12a594;
+  --difficulty-medium: #c2860b;
+  --difficulty-hard: #e5484d;
+
+  /* Warning callout ("recall dropping", "below target") */
+  --warning: #e2a336;
+  --warning-tint: #fff8e6;
+
+  /* Topic polygon + activity calendar: GitHub contribution scale, share solved.
+     0 = none solved … 4 = all solved. Light: darker = more. */
+  --heat-0: #ebedf0;
+  --heat-1: #9be9a8;
+  --heat-2: #40c463;
+  --heat-3: #30a14e;
+  --heat-4: #216e39;
+}
+
+.dark {
+  /* Surfaces — GitHub dark */
+  --background: #0d1117;
+  --card: #161b22;
+  --popover: #161b22;
+  --muted: #21262d;
+  --track: #30363d;
+  --border: #30363d;
+  --input: #30363d;
+  --chart-grid: #21262d;
+  --scrim: rgb(1 4 9 / 0.6);
+
+  /* Text */
+  --foreground: #e6edf3;
+  --foreground-2: #c9d1d9;
+  --muted-foreground: #8b949e;
+  --icon-inactive: #6e7681;
+
+  /* Accent */
+  --primary: #8b8dff;
+  --primary-foreground: #0d1117;
+  --primary-tint: #1d1f42;
+  --ring: #8b8dff;
+
+  /* Toast / tooltip: raised, not inverted (a white toast glares in dark) */
+  --toast: #30363d;
+  --toast-foreground: #e6edf3;
+  --toast-muted: #8b949e;
+
+  /* Grades */
+  --grade-forgot: #ff6369;    --grade-forgot-tint: #3b1219;    --grade-forgot-text: #ff8589;
+  --grade-struggled: #ff8b3e; --grade-struggled-tint: #331e0b; --grade-struggled-text: #ffa057;
+  --grade-recalled: #3fb950;  --grade-recalled-tint: #12261a;  --grade-recalled-text: #56d364;
+  --grade-instant: #58a6ff;   --grade-instant-tint: #0d2847;   --grade-instant-text: #79c0ff;
+
+  /* Difficulty */
+  --difficulty-easy: #2bc3aa;
+  --difficulty-medium: #e2b33c;
+  --difficulty-hard: #ff6369;
+
+  /* Warning */
+  --warning: #e2b33c;
+  --warning-tint: #2e2410;
+
+  /* Heat — GitHub dark convention: BRIGHTER = more solved (inverts the light rule).
+     heat-0 is #21262d, not GitHub's #161b22, so empty wedges stay visible on --card. */
+  --heat-0: #21262d;
+  --heat-1: #0e4429;
+  --heat-2: #006d32;
+  --heat-3: #26a641;
+  --heat-4: #39d353;
+}

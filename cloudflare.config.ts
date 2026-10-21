@@ -13,11 +13,15 @@ export default defineConfig(({ mode }) => ({
     },
     env: {
       ASSETS: bindings.assets(),
-      // Created automatically on first deploy.
-      KV: bindings.kv(),
+      // No id on purpose: `cf deploy` creates the database on first deploy, so
+      // nothing user-specific lives in the repo and forks sync cleanly.
+      // Tables are created by the Worker itself (src/lib/db.ts).
+      DB: bindings.d1({ name: "recursify" }),
       // Read from .dev.vars locally. In production it's a dashboard secret,
       // left undeclared so the very first deploy doesn't require it.
       SITE_TOKEN: mode === "development" && bindings.secret(),
+      // "true" only on the official deployment: serves the marketing home and lets it be indexed.
+      PUBLIC_SITE: mode === "development" && bindings.secret(),
     },
   }),
 }));

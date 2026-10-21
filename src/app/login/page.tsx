@@ -1,18 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { useState } from "react";
+import { LogoMark } from "@/components/app/AppShell";
+import { Kbd } from "@/components/app/ui";
+import { cn } from "@/lib/utils";
 
 export default function LoginPage() {
   const [token, setToken] = useState("");
@@ -20,68 +12,50 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-
     try {
-      const res = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
-      });
-
+      const res = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }) });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(data.error || "Login failed");
+        setError(res.status === 401 ? "That token didn't match. Check SITE_TOKEN in your Cloudflare Worker secrets." : data.error || "Sign-in failed");
         return;
       }
-
-      router.push("/tracker");
+      router.push("/today");
       router.refresh();
     } catch {
-      setError("An error occurred during login");
+      setError("Couldn't reach the server. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Sign in</CardTitle>
-          <CardDescription>
-            Enter the SITE_TOKEN you set for this deployment.
-          </CardDescription>
-        </CardHeader>
-        <form onSubmit={handleLogin}>
-          <CardContent className="space-y-4">
-            {error && (
-              <div className="text-sm font-medium text-destructive">
-                {error}
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="token">Site token</Label>
-              <Input
-                id="token"
-                type="password"
-                autoComplete="current-password"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                required
-              />
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in..." : "Sign in"}
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
-    </div>
+    <main id="main-content" className="flex min-h-dvh items-center justify-center bg-background p-4">
+      <title>Sign in · Recursify</title>
+      <meta name="robots" content="noindex, nofollow" />
+      <form onSubmit={submit} className="flex w-full max-w-[420px] flex-col items-center gap-5 rounded-xl border border-border bg-card px-9 py-9 shadow-xl">
+        <LogoMark size={56} />
+        <div className="text-center">
+          <h1 className="text-[28px] font-bold">Recursify</h1>
+          <p className="text-sm text-muted-foreground">Solve it. Let it fade. Recur.</p>
+        </div>
+        <label className="w-full space-y-1.5">
+          <span className="text-[13px] font-medium">Site token</span>
+          <input type="password" autoFocus required autoComplete="current-password" value={token} onChange={(e) => setToken(e.target.value)} aria-invalid={!!error}
+            className={cn("w-full rounded-lg border bg-card px-3 py-2.5 text-sm outline-none focus:border-2 focus:border-primary", error ? "border-2 border-forgot" : "border-border")} />
+          <span className={cn("block text-xs", error ? "text-forgot-text" : "text-muted-foreground")} role={error ? "alert" : undefined}>
+            {error || "Set as SITE_TOKEN in your Cloudflare Worker secrets"}
+          </span>
+        </label>
+        <button type="submit" disabled={loading} className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60">
+          {loading ? "Signing in…" : "Sign in"} <Kbd onPrimary>↵</Kbd>
+        </button>
+        <p className="text-xs text-muted-foreground">Self-hosted · your data stays in your D1</p>
+        <p className="-mt-3 text-xs text-muted-foreground">made by <a href="https://x.com/jammutkarsh" className="hover:text-foreground">@jammutkarsh</a></p>
+      </form>
+    </main>
   );
 }

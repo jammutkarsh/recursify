@@ -3,7 +3,7 @@
   "description": "A personal LeetCode tracker with spaced repetition. Fork it, deploy it to Cloudflare, own your data.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jammutkarsh/leetcode-tracker"
+    "url": "https://github.com/jammutkarsh/recursify"
   },
   "private": true,
   "version": "0.0.0",
@@ -16,7 +16,8 @@
     "types": "cf workers types",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test": "bun test"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

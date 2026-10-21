@@ -1,14 +1,10 @@
 import { env } from "cloudflare:workers";
 import { NextResponse } from "next/server";
-import { TOKEN_COOKIE, isValidToken } from "@/lib/auth";
+import { TOKEN_COOKIE, isValidToken, tokenProblem } from "@/lib/auth";
 
 export async function POST(req: Request) {
-  if (!env.SITE_TOKEN) {
-    return NextResponse.json(
-      { error: "SITE_TOKEN is not set on this deployment." },
-      { status: 500 },
-    );
-  }
+  const problem = tokenProblem(env.SITE_TOKEN);
+  if (problem) return NextResponse.json({ error: problem }, { status: 500 });
 
   const { token } = (await req.json().catch(() => ({}))) as { token?: string };
   if (!(await isValidToken(token))) {
