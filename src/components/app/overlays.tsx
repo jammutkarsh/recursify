@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useApp } from "@/context/AppData";
 import { BUILTIN_LISTS, builtinProblem, slugFromUrl, type Problem } from "@/lib/catalog";
+import { DEMO, demoApi, exportCsv } from "@/lib/demo";
 import { loadCatalog, searchCatalog, type CatalogProblem } from "@/lib/leetcode";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
@@ -190,9 +191,11 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
       <div className="h-px bg-border" />
       <div className="flex flex-wrap items-center gap-2">
         <span className="flex-1 text-[13px] font-medium">Data</span>
-        <a href="/api/export" className="rounded-md border border-border px-3.5 py-2 text-[13px] font-semibold hover:bg-muted">Export CSV</a>
+        <a href={DEMO ? undefined : "/api/export"} download={DEMO ? "recursify-demo.csv" : undefined}
+          onClick={DEMO ? (e) => { e.currentTarget.href = URL.createObjectURL(new Blob([exportCsv()], { type: "text/csv" })); } : undefined}
+          className="rounded-md border border-border px-3.5 py-2 text-[13px] font-semibold hover:bg-muted">Export CSV</a>
         <Link href="/library?import=1" onClick={onClose} className="rounded-md border border-border px-3.5 py-2 text-[13px] font-semibold hover:bg-muted">Import CSV</Link>
-        <button type="button" onClick={signOut} className="rounded-md border border-border px-3.5 py-2 text-[13px] font-semibold hover:bg-muted">Sign out</button>
+        {DEMO ? null : <button type="button" onClick={signOut} className="rounded-md border border-border px-3.5 py-2 text-[13px] font-semibold hover:bg-muted">Sign out</button>}
       </div>
       <ResetData />
       <p className="text-center text-xs text-muted-foreground">Recursify · made by <a className="underline-offset-2 hover:underline" href="https://x.com/jammutkarsh">@jammutkarsh</a></p>
@@ -212,9 +215,12 @@ function ResetData() {
   const reset = async () => {
     setBusy(true); setError(null);
     try {
-      const res = await fetch("/api/data", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirm: typed }) });
-      const out = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) throw new Error(out.error ?? "Reset failed");
+      if (DEMO) await demoApi("/api/data", { method: "DELETE" });
+      else {
+        const res = await fetch("/api/data", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirm: typed }) });
+        const out = (await res.json().catch(() => ({}))) as { error?: string };
+        if (!res.ok) throw new Error(out.error ?? "Reset failed");
+      }
       await reload();
       setOpen(false); setTyped("");
       setToast({ kind: "info", message: "All progress deleted. Starting fresh." });

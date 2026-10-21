@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { builtinProblem, slugFromUrl, type Problem } from "@/lib/catalog";
 import { buildModel, type AppData, type Model } from "@/lib/derive";
 import type { Grade } from "@/lib/fsrs";
+import { DEMO, demoApi } from "@/lib/demo";
 import { loadCatalog } from "@/lib/leetcode";
 import type { ReviewRow, Settings } from "@/lib/settings";
 
@@ -37,6 +38,7 @@ interface Ctx {
 const AppDataContext = createContext<Ctx | null>(null);
 
 async function api<T = unknown>(path: string, init?: RequestInit & { json?: unknown }): Promise<T> {
+  if (DEMO) return demoApi<T>(path, init);
   const res = await fetch(path, {
     ...init,
     headers: init?.json !== undefined ? { "content-type": "application/json" } : init?.headers,

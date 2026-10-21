@@ -1,8 +1,10 @@
 import { env } from "cloudflare:workers";
 import { NextResponse } from "next/server";
 import { TOKEN_COOKIE, isValidToken, tokenProblem } from "@/lib/auth";
+import { DEMO } from "@/lib/demo";
 
 export async function POST(req: Request) {
+  if (DEMO) return NextResponse.json({ error: "The demo has no sign-in" }, { status: 404 });
   const problem = tokenProblem(env.SITE_TOKEN);
   if (problem) return NextResponse.json({ error: problem }, { status: 500 });
 

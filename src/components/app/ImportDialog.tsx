@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useApp } from "@/context/AppData";
 import { builtinByTitle, builtinProblem, slugFromUrl } from "@/lib/catalog";
 import { csvRecords, toCsv } from "@/lib/csv";
+import { DEMO, demoApi } from "@/lib/demo";
 import { cn } from "@/lib/utils";
 import { Overlay } from "./overlays";
 import { diffText, Kbd } from "./ui";
@@ -40,10 +41,15 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
     if (!file) return;
     setBusy(true); setError(null);
     try {
-      const res = await fetch("/api/import", { method: "POST", body: file.text });
-      const out = (await res.json()) as { error?: string; problems: number; reviews: number; skipped: number; errors: string[] };
-      if (!res.ok) throw new Error(out.error ?? "Import failed");
-      setResult(out); await reload();
+      type Out = { error?: string; problems: number; reviews: number; skipped: number; errors: string[] };
+      if (DEMO) setResult(await demoApi<Out>("/api/import", { method: "POST", body: file.text }));
+      else {
+        const res = await fetch("/api/import", { method: "POST", body: file.text });
+        const out = (await res.json()) as Out;
+        if (!res.ok) throw new Error(out.error ?? "Import failed");
+        setResult(out);
+      }
+      await reload();
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   };
 

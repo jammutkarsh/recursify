@@ -5,9 +5,13 @@ const fromBuildEnv = (name: string) => {
   return value ? bindings.text(value) : undefined;
 };
 
+// Build variable NEXT_PUBLIC_DEMO=true builds the public demo: a separate Worker with no sign-in
+// and no D1 (data lives in each visitor's localStorage, see src/lib/demo.ts).
+const DEMO = process.env.NEXT_PUBLIC_DEMO === "true";
+
 export default defineConfig(({ mode }) => ({
   worker: defineWorker({
-    name: "recursify",
+    name: DEMO ? "recursify-demo" : "recursify",
     entrypoint: "vinext/server/fetch-handler",
     compatibilityDate: "2026-10-18",
     compatibilityFlags: ["nodejs_compat"],
@@ -19,7 +23,7 @@ export default defineConfig(({ mode }) => ({
       notFoundHandling: "none",
       runWorkerFirst: ["/*", "!/_next/static/*", "!/*/_next/static/*"],
     },
-    env: {
+    env: DEMO ? { ASSETS: bindings.assets() } : {
       ASSETS: bindings.assets(),
       // No id on purpose: `cf deploy` creates the database on first deploy, so
       // nothing user-specific lives in the repo and forks sync cleanly.

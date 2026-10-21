@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { LogoMark } from "@/components/app/AppShell";
 import { HomePolygon } from "@/components/app/HomePolygon";
 import { isPublicSite, isSignedIn } from "@/lib/auth";
+import { DEMO as IS_DEMO } from "@/lib/demo";
 
 // Copy is verbatim from the design spec; keep it in sync there.
 const ORIGIN = "https://recursify.utkarshchourasia.in";
@@ -38,7 +39,7 @@ const FEATURES = [
 ] as const;
 
 export default async function Home() {
-  if (await isSignedIn()) redirect("/today");
+  if (IS_DEMO || (await isSignedIn())) redirect("/today");
   // Forks and the demo open straight to sign-in; only the official site shows the marketing page.
   if (!isPublicSite()) redirect("/login");
 
