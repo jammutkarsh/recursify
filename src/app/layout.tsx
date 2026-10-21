@@ -15,7 +15,10 @@ export const viewport = {
 
 export const metadata = {
   title: { default: "Recursify", template: "%s · Recursify" },
-  icons: { icon: "/icon.png" },
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }, { url: "/icon.png", type: "image/png", sizes: "512x512" }],
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
