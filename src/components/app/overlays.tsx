@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useApp } from "@/context/AppData";
 import { BUILTIN_LISTS, builtinProblem, slugFromUrl, type Problem } from "@/lib/catalog";
-import { DEMO, demoApi, exportCsv } from "@/lib/demo";
+import { DEMO, exportCsv } from "@/lib/demo";
 import { loadCatalog, searchCatalog, type CatalogProblem } from "@/lib/leetcode";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
@@ -197,7 +197,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
         <Link href="/library?import=1" onClick={onClose} className="rounded-md border border-border px-3.5 py-2 text-[13px] font-semibold hover:bg-muted">Import CSV</Link>
         {DEMO ? null : <button type="button" onClick={signOut} className="rounded-md border border-border px-3.5 py-2 text-[13px] font-semibold hover:bg-muted">Sign out</button>}
       </div>
-      <ResetData />
+      {DEMO ? null : <ResetData />}
       <p className="text-center text-xs text-muted-foreground">Recursify · made by <a className="underline-offset-2 hover:underline" href="https://x.com/jammutkarsh">@jammutkarsh</a></p>
     </Overlay>
   );
@@ -215,12 +215,9 @@ function ResetData() {
   const reset = async () => {
     setBusy(true); setError(null);
     try {
-      if (DEMO) await demoApi("/api/data", { method: "DELETE" });
-      else {
-        const res = await fetch("/api/data", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirm: typed }) });
-        const out = (await res.json().catch(() => ({}))) as { error?: string };
-        if (!res.ok) throw new Error(out.error ?? "Reset failed");
-      }
+      const res = await fetch("/api/data", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirm: typed }) });
+      const out = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(out.error ?? "Reset failed");
       await reload();
       setOpen(false); setTyped("");
       setToast({ kind: "info", message: "All progress deleted. Starting fresh." });

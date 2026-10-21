@@ -99,7 +99,6 @@ export async function demoApi<T>(path: string, init?: { method?: string; json?: 
     case "DELETE /api/problems": { const id = q("id"); s.reviews = s.reviews.filter((r) => r.problemId !== id); s.customProblems = s.customProblems.filter((p) => p.id !== id); s.myList = s.myList.filter((x) => x !== id); break; }
     case "PUT /api/settings": s.settings = { ...s.settings, ...(b as object) }; break;
     case "POST /api/import": out = importCsv(s, String(init?.body ?? "")); break;
-    case "DELETE /api/data": write(empty()); return out as T;
     default: throw new Error("Not available in the demo");
   }
   write(s);
