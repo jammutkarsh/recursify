@@ -22,6 +22,18 @@ const MIGRATIONS = [
   // My list = custom problems plus any built-in problems the user adds or imports.
   `CREATE TABLE IF NOT EXISTS my_list (problem_id TEXT PRIMARY KEY, added_at TEXT NOT NULL)`,
   `INSERT OR IGNORE INTO my_list (problem_id, added_at) SELECT id, created_at FROM custom_problems`,
+  // Named lists. Each item carries its own section (the list's topic for that problem), like the built-in lists.
+  // My list becomes the default list "custom"; the old my_list table is no longer read.
+  `CREATE TABLE IF NOT EXISTS lists (id TEXT PRIMARY KEY, name TEXT NOT NULL, created_at TEXT NOT NULL)`,
+  `CREATE TABLE IF NOT EXISTS list_items (
+     list_id TEXT NOT NULL,
+     problem_id TEXT NOT NULL,
+     section TEXT,
+     added_at TEXT NOT NULL,
+     PRIMARY KEY (list_id, problem_id)
+   )`,
+  `INSERT OR IGNORE INTO lists (id, name, created_at) VALUES ('custom', 'My list', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
+  `INSERT OR IGNORE INTO list_items (list_id, problem_id, section, added_at) SELECT 'custom', problem_id, NULL, added_at FROM my_list ORDER BY added_at`,
 ];
 
 let ready: Promise<D1Database> | null = null;

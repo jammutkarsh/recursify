@@ -24,7 +24,7 @@ It checks your tools and logins, forks this repo, deploys it to Cloudflare Worke
 
 ### Updates
 
-`master` only ever holds tagged releases. To update, click **Sync fork** on your fork's GitHub page; Cloudflare redeploys automatically if you connected builds (DEPLOY.md step 7). Your data lives in D1, not in the repo, so syncing never touches it.
+`master` only ever holds tagged releases. To update, click **Sync fork** on your fork's GitHub page; Cloudflare redeploys automatically if you connected builds (DEPLOY.md step 8). Your data lives in D1, not in the repo, so syncing never touches it.
 
 ### Optional variables
 

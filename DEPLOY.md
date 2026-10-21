@@ -66,7 +66,7 @@ If the user already has a fork, `gh repo fork` says so. Then clone it with `gh r
 
 Pass: `npx cf --version` prints a version from inside the `recursify` folder.
 
-The fork matters: the user's copy of the code lives in their GitHub, and they get updates with GitHub's **Sync fork** button (step 7).
+The fork matters: the user's copy of the code lives in their GitHub, and they get updates with GitHub's **Sync fork** button (step 8).
 
 ## 4. Check for name clashes
 
@@ -85,13 +85,40 @@ chmod 600 .dev.vars
 
 The app refuses tokens shorter than 24 characters and the example placeholder. `.dev.vars` is git-ignored, and `bun run dev` uses it for local development too.
 
-## 6. Deploy
+## 6. Create the database near the user
+
+The D1 database lives in one region, chosen when it's created; it can't move later. Left to `cf deploy` (or to Cloudflare's build servers, which run in the US), it lands wherever the command runs. So create it yourself first, in the region nearest the user, and the deploy then uses it.
+
+```sh
+curl -s https://cloudflare.com/cdn-cgi/trace | grep -E '^(loc|colo)='   # loc = user's country, colo = nearest Cloudflare city (IATA code)
+```
+
+Pick the hint from `loc`:
+
+| Hint | Where |
+| --- | --- |
+| `apac` | Asia, India, Middle East |
+| `oc` | Australia, New Zealand, Pacific |
+| `weur` | Western Europe, UK, Nordics, Africa |
+| `eeur` | Eastern Europe, Turkey |
+| `wnam` | US/Canada west of the Rockies (colo such as SEA, PDX, SFO, SJC, LAX, LAS, PHX, DEN, SLC, YVR) |
+| `enam` | the rest of North America, Central and South America |
+
+```sh
+npx cf d1 list | grep -q '"name": "recursify"' || npx cf d1 create --name recursify --primary-location-hint <hint>
+```
+
+Pass: `npx cf d1 list` shows `recursify`. (If it already existed, leave it alone: it may hold the user's data.)
+
+The Worker itself runs in every Cloudflare city, and the config turns on Smart Placement, which moves it next to the database.
+
+## 7. Deploy
 
 ```sh
 SITE_TOKEN="$(sed -n 's/^SITE_TOKEN=//p' .dev.vars)" $PM run deploy
 ```
 
-This runs `cf deploy`. It builds the app, creates the D1 database `recursify` on first deploy, and uploads the Worker with `SITE_TOKEN` as a variable. The app creates its own tables on first request. **Don't use `wrangler deploy`**: it rejects this build output.
+This runs `cf deploy`. It builds the app, binds the D1 database `recursify` from step 6, and uploads the Worker with `SITE_TOKEN` as a variable. The app creates its own tables on first request. **Don't use `wrangler deploy`**: it rejects this build output.
 
 Find the `https://…workers.dev` URL in the output. Call it `$URL`.
 
@@ -111,9 +138,9 @@ curl -s -b /tmp/recursify-cookie "$URL/api/data" | head -c 80; echo; rm -f /tmp/
 
 The last check proves D1 works. If `/api/login` returns a "SITE_TOKEN not set" error, the variable didn't reach the Worker: re-run the deploy command exactly as written above.
 
-## 7. Auto-deploy updates (recommended)
+## 8. Auto-deploy updates (recommended)
 
-Without this, the Worker only changes when someone re-runs step 6. With it, Cloudflare rebuilds whenever the fork's `master` changes, which is what **Sync fork** does. `master` only ever holds tagged releases, so users only receive released versions.
+Without this, the Worker only changes when someone re-runs step 7. With it, Cloudflare rebuilds whenever the fork's `master` changes, which is what **Sync fork** does. `master` only ever holds tagged releases, so users only receive released versions.
 
 Connecting GitHub to Cloudflare needs the Cloudflare GitHub app, which only the user can approve in a browser. Ask them to:
 
@@ -140,9 +167,9 @@ npx cf builds workers update "$TAG" --previews-enabled false
 
 If `deploy_command` isn't `bun run deploy`, fix it with `npx cf builds triggers update "$TRIGGER" --build-command "" --deploy-command "bun run deploy"`.
 
-Wait for the build: poll `npx cf builds list --external-script-id "$TAG" --per-page 1` every ~20 s until `status` is `stopped`. `build_outcome` must be `success`. Then repeat the step 6 checks against `$URL`.
+Wait for the build: poll `npx cf builds list --external-script-id "$TAG" --per-page 1` every ~20 s until `status` is `stopped`. `build_outcome` must be `success`. Then repeat the step 7 checks against `$URL`.
 
-## 8. Report to the user
+## 9. Report to the user
 
 Give them exactly this, filled in:
 
@@ -153,14 +180,14 @@ URL:         <URL>
 SITE_TOKEN:  <token from .dev.vars>   ← your password; store it in a password manager
 
 Your fork:   https://github.com/<login>/recursify
-Updates:     open your fork on GitHub → Sync fork. Cloudflare redeploys by itself.   (or: re-run step 6, if step 7 was skipped)
+Updates:     open your fork on GitHub → Sync fork. Cloudflare redeploys by itself.   (or: re-run step 7, if step 8 was skipped)
 Your data:   Cloudflare D1 database "recursify". It's never in the repo, so syncing can't touch it.
 ```
 
 Then mention, briefly:
 
-- **If a build later fails with "Aborting the upload operation because of conflicts":** that happens after a setting is changed in the dashboard (a custom domain, Smart Placement…). Add build variables `CUSTOM_DOMAIN` (their domain) and `D1_DATABASE_ID` (from `npx cf d1 list` or the dashboard) with the step 7 command, then start a build.
+- **If a build later fails with "Aborting the upload operation because of conflicts":** that happens after a setting is changed in the dashboard (a custom domain, Smart Placement…). Add build variables `CUSTOM_DOMAIN` (their domain) and `D1_DATABASE_ID` (from `npx cf d1 list` or the dashboard) with the step 8 command, then start a build.
 
 - **Custom domain:** dashboard → Worker `recursify` → Settings → Domains & Routes → Add.
-- **Changing the password:** set a new `SITE_TOKEN` build variable (step 7 command) and start a build, or re-run step 6 with a new `.dev.vars`.
+- **Changing the password:** set a new `SITE_TOKEN` build variable (step 8 command) and start a build, or re-run step 7 with a new `.dev.vars`.
 - **Local development:** `bun run dev`, then open `http://[::1]:5173` and sign in with the same token.

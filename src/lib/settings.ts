@@ -17,4 +17,9 @@ export const DEFAULT_SETTINGS: Settings = {
   reminder: { enabled: false, time: "09:00" },
 };
 
+/** A list the user made. Each item has its own section (topic) in this list; null = the problem's own first topic. */
+export interface UserList { id: string; name: string; items: { id: string; section: string | null }[] }
+/** The default list (formerly "My list"): can be renamed, not deleted. */
+export const DEFAULT_LIST_ID = "custom";
+
 export interface ReviewRow { id: number; problemId: string; date: string; grade: Grade | null }
