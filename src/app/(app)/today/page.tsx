@@ -6,7 +6,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { isTyping } from "@/components/app/AppShell";
 import { useKey } from "@/components/app/overlays";
 import { HeatLegend, TopicPolygon } from "@/components/app/TopicPolygon";
-import { Banner, describeDue, GRADES, GradeButtons, InfoTip, Kbd, Meta, Picker } from "@/components/app/ui";
+import { Banner, describeDue, GRADES, GradeButtons, InfoTip, Kbd, Meta } from "@/components/app/ui";
 import { useApp, type Toast } from "@/context/AppData";
 import { BUILTIN_LISTS, builtinProblem, slugFromUrl, type Problem } from "@/lib/catalog";
 import { gradeIntervals, type Tracked } from "@/lib/derive";
@@ -14,7 +14,7 @@ import { daysBetween, intervalDays, type Difficulty } from "@/lib/fsrs";
 import { lookupLeetCode } from "@/lib/leetcode";
 import { cn } from "@/lib/utils";
 
-const POLY_TIP = "Each wedge is a topic in the selected list. Greener = more of it solved. Hover a wedge for its stats; click it to open that topic in Library.";
+const POLY_TIP = "Each wedge is a topic across all the lists you follow; a problem in several lists counts once. Greener = more of it solved. Hover a wedge for its stats; click it to open that topic in Library.";
 const ALL: Problem[] = [...new Map(BUILTIN_LISTS.flatMap((l) => l.sections.map((s) => [s.id, builtinProblem(s.id)!]))).values()];
 
 export default function TodayPage() {
@@ -31,8 +31,9 @@ export default function TodayPage() {
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-semibold">Topic hold</h1>
           <InfoTip text={POLY_TIP} />
-          <Picker label="Polygon list" className="ml-auto" value={data.settings.polygonList} onChange={(v) => app.saveSettings({ polygonList: v })}
-            options={model.lists.map((l) => ({ value: l.id, label: l.name }))} />
+          <span className="ml-auto truncate text-[13px] text-muted-foreground" title="The polygon combines every list you follow">
+            {data.settings.followedLists.map((id) => model.list(id).name).join(" + ")}
+          </span>
         </div>
         <TopicPolygon sections={model.polygon} today={today} />
         <HeatLegend />

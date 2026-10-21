@@ -53,6 +53,36 @@ export const customList = (custom: Problem[]): ListDef => ({
   sections: custom.map((p) => ({ id: p.id, section: p.topics[0] ?? "Uncategorised" })),
 });
 
+// Topic names differ per list; map them onto NeetCode's so one polygon can combine lists.
+const NEETCODE_ORDER = ["Arrays & Hashing", "Two Pointers", "Sliding Window", "Stack", "Binary Search", "Linked Lists", "Trees", "Tries",
+  "Heap/Priority Queue", "Backtracking", "Graphs", "Advanced Graphs", "1-D DP", "2-D DP", "Greedy", "Intervals", "Math & Geometry", "Bit Manipulation"];
+const ALIASES: Record<string, string> = {
+  "array / string": "Arrays & Hashing", "hash map / set": "Arrays & Hashing", "prefix sum": "Arrays & Hashing", "arrays": "Arrays & Hashing", "array": "Arrays & Hashing", "hashing": "Arrays & Hashing",
+  "monotonic stack": "Stack", "queue": "Stack",
+  "linked list": "Linked Lists",
+  "binary tree - dfs": "Trees", "binary tree - bfs": "Trees", "binary search tree": "Trees", "tree": "Trees",
+  "trie": "Tries",
+  "heap": "Heap/Priority Queue", "heap / priority queue": "Heap/Priority Queue", "priority queue": "Heap/Priority Queue",
+  "graphs - dfs": "Graphs", "graphs - bfs": "Graphs", "graph": "Graphs",
+  "1-d dynamic programming": "1-D DP", "dp - 1d": "1-D DP", "dynamic programming": "1-D DP",
+  "2-d dynamic programming": "2-D DP", "dp - multidimensional": "2-D DP",
+  "math": "Math & Geometry", "geometry": "Math & Geometry", "bit manipulation": "Bit Manipulation",
+};
+const CANON = new Map(NEETCODE_ORDER.map((n) => [n.toLowerCase(), n]));
+export const canonicalTopic = (name: string) => CANON.get(name.toLowerCase()) ?? ALIASES[name.toLowerCase()] ?? name;
+
+export const FOLLOWED_LIST_ID = "followed";
+
+/** One list made of every followed list: each problem once, under its canonical topic (NeetCode's when it's in NeetCode). */
+export function combineLists(lists: ListDef[]): ListDef {
+  const nc = new Map(BUILTIN_LISTS[0].sections.map((s) => [s.id, s.section]));
+  const seen = new Map<string, string>();
+  for (const l of lists) for (const s of l.sections) if (!seen.has(s.id)) seen.set(s.id, nc.get(s.id) ?? canonicalTopic(s.section));
+  const rank = (t: string) => { const i = NEETCODE_ORDER.indexOf(t); return i < 0 ? NEETCODE_ORDER.length : i; };
+  const sections = [...seen].map(([id, section]) => ({ id, section })).sort((a, b) => rank(a.section) - rank(b.section));
+  return { id: FOLLOWED_LIST_ID, name: "All followed lists", sections };
+}
+
 /** Ordered unique sections of a list = polygon wedges. */
 export const sectionsOf = (list: ListDef) => [...new Set(list.sections.map((s) => s.section))];
 

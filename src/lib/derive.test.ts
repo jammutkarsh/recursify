@@ -43,7 +43,7 @@ test("custom problems live in My list; progress counts unique solves in followed
   expect(m.list("custom").sections).toEqual([{ id: "custom-x", section: "System Design" }]);
   const p = progress(m, d, "2026-10-20");
   expect(p.solvedUnique).toBe(2); // two-sum is in NeetCode and Blind 75 but counts once
-  expect(p.perList.map((l) => [l.id, l.solved, l.followed])).toEqual([["neetcode150", 1, true], ["blind75", 1, true], ["leetcode75", 1, false], ["custom", 1, true]]);
+  expect(p.perList.map((l) => [l.id, l.solved, l.followed])).toEqual([["neetcode150", 1, true], ["blind75", 1, true], ["leetcode75", 0, false], ["custom", 1, true]]);
 });
 
 test("history details report the gap and predicted recall at each review", () => {
@@ -55,4 +55,14 @@ test("history details report the gap and predicted recall at each review", () =>
   expect(first.gap).toBeNull();
   expect(second.gap).toBe(3);
   expect(second.recallThen!).toBeGreaterThan(0.85); // Easy: reviewed right at its 3-day mark
+});
+
+test("polygon combines followed lists under shared topic names", () => {
+  const base = { ...DEFAULT_SETTINGS, followedLists: ["neetcode150", "blind75", "leetcode75"] };
+  const m = buildModel(data([], { settings: base }), "2026-10-20");
+  expect(m.polygon.length).toBe(18); // Blind 75 and LeetCode 75 topics fold into NeetCode's 18
+  const total = m.polygon.reduce((n, s) => n + s.total, 0);
+  const unique = new Set(m.polyList.sections.map((s) => s.id)).size;
+  expect(total).toBe(unique); // each problem counted once
+  expect(m.polygon.find((s) => s.name === "1-D DP")!.total).toBeGreaterThan(12); // NeetCode's 12 plus extras from LeetCode 75
 });

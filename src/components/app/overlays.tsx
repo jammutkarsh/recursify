@@ -107,7 +107,6 @@ export function ListPicker({ onClose }: { onClose: () => void }) {
           <button key={l.id} type="button" onClick={() => toggle(l.id)} className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left transition-colors hover:bg-primary-tint">
             <span className={cn("flex size-4 items-center justify-center rounded-[4px]", on ? "bg-primary text-primary-foreground" : "border-[1.5px] border-icon-inactive")}>{on ? <Check className="size-3" strokeWidth={3} /> : null}</span>
             <span className={cn("flex-1 text-sm", on ? "font-medium" : "text-muted-foreground")}>{l.name}</span>
-            {data.settings.polygonList === l.id ? <span className="rounded-[4px] bg-primary-tint px-1.5 py-0.5 text-[11px] font-medium text-primary">polygon</span> : null}
             <span className="font-mono text-xs text-muted-foreground">{solved}/{l.sections.length}</span>
           </button>
         );

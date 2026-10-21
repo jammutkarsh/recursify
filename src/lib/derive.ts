@@ -1,5 +1,5 @@
 // Pure view-model derivation: raw data in, everything the screens show out.
-import { BUILTIN_LISTS, builtinProblem, customList, sectionsOf, type ListDef, type Problem } from "./catalog";
+import { BUILTIN_LISTS, builtinProblem, combineLists, customList, FOLLOWED_LIST_ID, sectionsOf, type ListDef, type Problem } from "./catalog";
 import { daysBetween, dueDate, firstSolve, fromDay, previewIntervals, recallsToTarget, replay, retrievability, review, toDay, type Card, type Grade } from "./fsrs";
 import type { ReviewRow, Settings } from "./settings";
 
@@ -29,7 +29,8 @@ export function buildModel(data: AppData, today: string) {
   const problem = (id: string): Problem | undefined => custom.get(id) ?? builtinProblem(id);
   const myList = customList(data.myList.map(problem).filter(Boolean) as Problem[]);
   const lists: ListDef[] = [...BUILTIN_LISTS, myList];
-  const list = (id: string) => lists.find((l) => l.id === id) ?? BUILTIN_LISTS[0];
+  const followed = combineLists(data.settings.followedLists.map((id) => lists.find((l) => l.id === id)).filter(Boolean) as ListDef[]);
+  const list = (id: string) => (id === FOLLOWED_LIST_ID ? followed : lists.find((l) => l.id === id) ?? followed);
   const { targetRecall } = data.settings;
 
   // Cards by replaying each problem's reviews.
@@ -63,8 +64,8 @@ export function buildModel(data: AppData, today: string) {
   const todayReviews = data.reviews.filter((r) => r.date === today).sort((a, b) => b.id - a.id);
   const firstSolvesToday = todayReviews.filter((r) => tracked.get(r.problemId)?.firstSolved === today && r.grade === null).length;
 
-  // Polygon = sections of the chosen list.
-  const polyList = list(data.settings.polygonList);
+  // Polygon = every followed list combined.
+  const polyList = followed;
   const polygon = sectionsOf(polyList).map((name) => {
     const ids = polyList.sections.filter((s) => s.section === name).map((s) => s.id);
     const ts = ids.map((id) => tracked.get(id)).filter(Boolean) as Tracked[];

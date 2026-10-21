@@ -8,7 +8,7 @@ import { useKey } from "@/components/app/overlays";
 import { ProblemDrawer } from "@/components/app/ProblemDrawer";
 import { ago, describeDue, diffText, GRADES, Kbd, Picker } from "@/components/app/ui";
 import { useApp } from "@/context/AppData";
-import { sectionsOf, type Problem } from "@/lib/catalog";
+import { FOLLOWED_LIST_ID, sectionsOf, type Problem } from "@/lib/catalog";
 import type { Tracked } from "@/lib/derive";
 import { daysBetween } from "@/lib/fsrs";
 import { cn } from "@/lib/utils";
@@ -34,7 +34,7 @@ function Library() {
   const topic = params.get("topic") ?? "";
   const openId = params.get("p");
   const importing = params.has("import");
-  const listId = params.get("list") ?? data?.settings.polygonList ?? "neetcode150";
+  const listId = params.get("list") ?? FOLLOWED_LIST_ID;
   const sort = (params.get("sort") as Sort) ?? "weakest";
 
   const setParam = (k: string, v: string | null) => {
@@ -87,7 +87,7 @@ function Library() {
     <div className="mx-auto flex h-full max-w-[1440px] flex-col gap-4 px-4 pt-6 md:px-8">
       <h1 className="sr-only">Library</h1>
       <div className="flex flex-wrap items-center gap-2">
-        <Picker label="List" value={listId} onChange={(v) => setParam("list", v)} options={model.lists.map((l) => ({ value: l.id, label: l.name }))} />
+        <Picker label="List" value={listId} onChange={(v) => setParam("list", v === FOLLOWED_LIST_ID ? null : v)} options={[{ value: FOLLOWED_LIST_ID, label: "All followed lists" }, ...model.lists.map((l) => ({ value: l.id, label: l.name }))]} />
         <Picker label="Topic" triggerRef={topicRef} prefix="Topic:" active={!!topic} value={topic || "all"} onChange={(v) => setParam("topic", v === "all" ? null : v)}
           options={[{ value: "all", label: "all" }, ...sectionsOf(list).map((s) => ({ value: s, label: s }))]} />
         <Picker label="Sort" prefix="Sort:" value={sort} onChange={(v) => setParam("sort", v)}
