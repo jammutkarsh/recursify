@@ -12,6 +12,8 @@ const DEMO = process.env.NEXT_PUBLIC_DEMO === "true";
 export default defineConfig(({ mode }) => ({
   worker: defineWorker({
     name: DEMO ? "recursify-demo" : "recursify",
+    // Only the demo declares its domain; the main Worker's custom domain is set per deployment in the dashboard.
+    ...(DEMO && { domains: ["demo.recursify.utkarshchourasia.in"] }), // same as DEMO_URL in src/lib/links.ts
     entrypoint: "vinext/server/fetch-handler",
     compatibilityDate: "2026-10-18",
     compatibilityFlags: ["nodejs_compat"],
