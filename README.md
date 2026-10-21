@@ -31,6 +31,7 @@ It checks your tools and logins, forks this repo, deploys it to Cloudflare Worke
 | Variable      | Purpose |
 | ------------- | ------- |
 | `PUBLIC_SITE` | Build variable. Set to `true` only on the official site. It shows the marketing home page and allows search indexing. Every other deployment opens straight to sign-in and sends `noindex`. |
+| `CUSTOM_DOMAIN`, `D1_DATABASE_ID` | Build variables, only needed after you change the Worker's settings in the Cloudflare dashboard (custom domain, Smart Placement, …). From then on, builds stop with "Aborting the upload operation because of conflicts" unless the config matches what's live. Set them to your domain and your D1 database's ID. |
 
 ## Releasing (maintainers)
 

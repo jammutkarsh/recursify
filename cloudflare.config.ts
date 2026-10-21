@@ -16,6 +16,9 @@ export default defineConfig(({ mode }) => ({
     ...(DEMO && { domains: ["demo.recursify.utkarshchourasia.in"] }), // same as DEMO_URL in src/lib/links.ts
     // Run near the D1 database: each request makes several D1 round trips. The demo has no database.
     ...(!DEMO && { placement: { mode: "smart" as const } }),
+    // Optional build variables, only for a deployment whose settings were changed in the dashboard: after
+    // that, CI deploys stop unless this config matches what's live, including the domain and the D1 id.
+    ...(!DEMO && process.env.CUSTOM_DOMAIN && { domains: [process.env.CUSTOM_DOMAIN] }),
     entrypoint: "vinext/server/fetch-handler",
     compatibilityDate: "2026-10-18",
     compatibilityFlags: ["nodejs_compat"],
@@ -29,10 +32,10 @@ export default defineConfig(({ mode }) => ({
     },
     env: DEMO ? { ASSETS: bindings.assets() } : {
       ASSETS: bindings.assets(),
-      // No id on purpose: `cf deploy` creates the database on first deploy, so
-      // nothing user-specific lives in the repo and forks sync cleanly.
+      // No id in the repo: `cf deploy` creates the database on first deploy, so
+      // nothing user-specific lives here and forks sync cleanly (D1_DATABASE_ID: see above).
       // Tables are created by the Worker itself (src/lib/db.ts).
-      DB: bindings.d1({ name: "recursify" }),
+      DB: bindings.d1({ name: "recursify", ...(process.env.D1_DATABASE_ID && { id: process.env.D1_DATABASE_ID }) }),
       // In production these come from the Workers Builds build variables of the same
       // name and are deployed as plain-text vars. Locally they're read from .dev.vars.
       // When a build variable is absent the binding is left undeclared, so a

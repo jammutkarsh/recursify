@@ -159,6 +159,8 @@ Your data:   Cloudflare D1 database "recursify". It's never in the repo, so sync
 
 Then mention, briefly:
 
+- **If a build later fails with "Aborting the upload operation because of conflicts":** that happens after a setting is changed in the dashboard (a custom domain, Smart Placement…). Add build variables `CUSTOM_DOMAIN` (their domain) and `D1_DATABASE_ID` (from `npx cf d1 list` or the dashboard) with the step 7 command, then start a build.
+
 - **Custom domain:** dashboard → Worker `recursify` → Settings → Domains & Routes → Add.
 - **Changing the password:** set a new `SITE_TOKEN` build variable (step 7 command) and start a build, or re-run step 6 with a new `.dev.vars`.
 - **Local development:** `bun run dev`, then open `http://[::1]:5173` and sign in with the same token.
