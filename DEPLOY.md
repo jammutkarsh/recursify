@@ -132,6 +132,12 @@ npx cf builds triggers environment-variables upsert "$TRIGGER" \
 npx cf builds create "$TRIGGER" --branch master
 ```
 
+Turn off branch previews. Their default `npx wrangler preview` command fails on this project, and a preview would run unreleased code against the same D1 database:
+
+```sh
+npx cf builds workers update "$TAG" --previews-enabled false
+```
+
 If `deploy_command` isn't `bun run deploy`, fix it with `npx cf builds triggers update "$TRIGGER" --build-command "" --deploy-command "bun run deploy"`.
 
 Wait for the build: poll `npx cf builds list --external-script-id "$TAG" --per-page 1` every ~20 s until `status` is `stopped`. `build_outcome` must be `success`. Then repeat the step 6 checks against `$URL`.
