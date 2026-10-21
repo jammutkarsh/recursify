@@ -4,14 +4,12 @@ import { LogoMark } from "@/components/app/AppShell";
 import { HomePolygon } from "@/components/app/HomePolygon";
 import { isPublicSite, isSignedIn } from "@/lib/auth";
 import { DEMO as IS_DEMO } from "@/lib/demo";
+import { DEMO_URL, DEPLOY_GUIDE, REPO } from "@/lib/links";
 
 // Copy is verbatim from the design spec; keep it in sync there.
 const ORIGIN = "https://recursify.utkarshchourasia.in";
 const TITLE = "Recursify: LeetCode Tracker with Spaced Repetition";
 const DESCRIPTION = "Free, self-hosted LeetCode tracker that brings problems back right before you forget them. FSRS spaced repetition for NeetCode 150, Blind 75 and your own lists.";
-const REPO = "https://github.com/jammutkarsh/recursify";
-const DEPLOY_GUIDE = `${REPO}#deploy-your-own`;
-const DEMO = "https://demo.recursify.utkarshchourasia.in";
 
 export const metadata = {
   title: { absolute: TITLE },
@@ -65,7 +63,7 @@ export default async function Home() {
             </p>
             <div className="flex flex-wrap gap-3">
               <a href={DEPLOY_GUIDE} className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-3 text-[15px] font-semibold text-primary-foreground">Deploy your own</a>
-              <a href={DEMO} className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-5 py-3 text-[15px] font-semibold">▷ Try the demo</a>
+              <a href={DEMO_URL} className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-5 py-3 text-[15px] font-semibold">▷ Try the demo</a>
             </div>
           </div>
           <HomePolygon />
@@ -90,7 +88,7 @@ export default async function Home() {
           <p className="text-[17px] text-foreground-2">Fork it and deploy in about five minutes, or try the demo first.</p>
           <div className="flex flex-wrap justify-center gap-3">
             <a href={DEPLOY_GUIDE} className="rounded-lg bg-primary px-5 py-3 text-[15px] font-semibold text-primary-foreground">Deploy your own</a>
-            <a href={DEMO} className="rounded-lg border border-border bg-card px-5 py-3 text-[15px] font-semibold">▷ Try the demo</a>
+            <a href={DEMO_URL} className="rounded-lg border border-border bg-card px-5 py-3 text-[15px] font-semibold">▷ Try the demo</a>
           </div>
         </section>
       </main>

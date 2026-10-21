@@ -2,6 +2,8 @@
 
 Recursify brings each LeetCode problem back right before you'd forget it, and shows which topics are slipping. It's free, self-hosted on Cloudflare, and your data stays in your own account.
 
+**[Try the demo](https://demo.recursify.utkarshchourasia.in)** (no sign-up; your data stays in your browser) · **[Deploy your own](#deploy-your-own)**
+
 - **FSRS spaced repetition.** Grade each re-solve 1–4 (Forgot, Struggled, Recalled, Instant) and the schedule adapts to you. A first solve is seeded by difficulty: Easy about 3 days, Medium 2, Hard 1.
 - **Topic polygon.** One wedge per topic of your list, greener as you solve more.
 - **Lists.** Blind 75, LeetCode 75 and NeetCode 150 are built in, plus My list for your own problems, LeetCode or not. Follow several at once.

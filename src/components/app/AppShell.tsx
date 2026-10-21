@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, type ReactNode, type RefObject } from "rea
 import { useTheme } from "@/lib/theme";
 import { useApp } from "@/context/AppData";
 import { DEMO } from "@/lib/demo";
+import { DEPLOY_GUIDE } from "@/lib/links";
 import { cn } from "@/lib/utils";
 import { ListPicker, SearchPanel, SettingsDialog, ShortcutsDialog, useKey } from "./overlays";
 import { ToastBar } from "./ToastBar";
@@ -75,7 +76,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="flex h-dvh flex-col">
       {DEMO ? (
         <p className="shrink-0 bg-primary px-4 py-1.5 text-center text-xs text-primary-foreground">
-          Demo · your data stays in this browser only. <a href="https://github.com/jammutkarsh/recursify#deploy-your-own" className="font-semibold underline underline-offset-2">Deploy your own →</a>
+          Demo · your data stays in this browser only. <a href={DEPLOY_GUIDE} className="font-semibold underline underline-offset-2">Deploy your own →</a>
         </p>
       ) : null}
       <header className="relative z-30 flex shrink-0 items-center gap-4 border-b border-border bg-card px-4 py-3 md:px-8">
