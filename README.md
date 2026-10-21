@@ -21,7 +21,9 @@ You need a GitHub account and a free Cloudflare account.
    - Build command: _leave empty_
    - Deploy command: `bun run deploy` (runs `cf deploy`; not `npx wrangler deploy`, which rejects this build output)
 4. Click **Deploy**. The D1 database is created on the first deploy, and the app creates its own tables on first use.
-5. Open the Worker's **Settings → Variables and Secrets** and add a **Secret** named `SITE_TOKEN`. Set it to a long random string (at least 24 characters), for example the output of `openssl rand -hex 32`. This is your password; placeholder values are refused.
+5. Set your password, `SITE_TOKEN`: a long random string (at least 24 characters), for example the output of `openssl rand -hex 32`. Placeholder values are refused. Either:
+   - add it under **Settings → Build → Variables and secrets** (it's deployed as a plain-text variable on every build), or
+   - add it as a **Secret** under **Settings → Variables and Secrets** (encrypted; can't be read back).
 6. Visit your `*.workers.dev` URL and sign in with `SITE_TOKEN`.
 
 Every push to your fork's `master` branch redeploys.
@@ -34,7 +36,7 @@ New versions are tagged releases on `master`. To update, click **Sync fork** on 
 
 | Variable      | Purpose |
 | ------------- | ------- |
-| `PUBLIC_SITE` | Set to `true` only on the official site. It shows the marketing home page and allows search indexing. Every other deployment opens straight to sign-in and sends `noindex`. |
+| `PUBLIC_SITE` | Build variable (or Secret). Set to `true` only on the official site. It shows the marketing home page and allows search indexing. Every other deployment opens straight to sign-in and sends `noindex`. |
 
 ## Local development
 

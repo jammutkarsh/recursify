@@ -1,5 +1,10 @@
 import { bindings, defineConfig, defineWorker } from "cf/config";
 
+const fromBuildEnv = (name: string) => {
+  const value = process.env[name];
+  return value ? bindings.text(value) : undefined;
+};
+
 export default defineConfig(({ mode }) => ({
   worker: defineWorker({
     name: "recursify",
@@ -20,11 +25,13 @@ export default defineConfig(({ mode }) => ({
       // nothing user-specific lives in the repo and forks sync cleanly.
       // Tables are created by the Worker itself (src/lib/db.ts).
       DB: bindings.d1({ name: "recursify" }),
-      // Read from .dev.vars locally. In production it's a dashboard secret,
-      // left undeclared so the very first deploy doesn't require it.
-      SITE_TOKEN: mode === "development" && bindings.secret(),
+      // In production these come from the Workers Builds build variables of the same
+      // name and are deployed as plain-text vars. Locally they're read from .dev.vars.
+      // When a build variable is absent the binding is left undeclared, so a
+      // dashboard secret of the same name still works.
+      SITE_TOKEN: fromBuildEnv("SITE_TOKEN") ?? (mode === "development" && bindings.secret()),
       // "true" only on the official deployment: serves the marketing home and lets it be indexed.
-      PUBLIC_SITE: mode === "development" && bindings.secret(),
+      PUBLIC_SITE: fromBuildEnv("PUBLIC_SITE") ?? (mode === "development" && bindings.secret()),
     },
   }),
 }));
