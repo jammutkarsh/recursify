@@ -226,7 +226,9 @@ function TodayRow({ id, pending, grade, onGraded }: { id: string; pending: boole
         <div className="flex items-center gap-3">
           {!pending && grade === null && !needsTopics ? <Check className="size-4 text-recalled" strokeWidth={3} /> : null}
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-medium">{p.title}</span>
+            {p.url ? (
+              <a href={p.url} target="_blank" rel="noopener noreferrer" className="block truncate text-sm font-medium underline-offset-2 hover:text-primary hover:underline">{p.title}</a>
+            ) : <span className="block truncate text-sm font-medium">{p.title}</span>}
             <Meta topic={p.topics[0] ?? (p.custom ? "Custom" : undefined)} difficulty={p.difficulty}
               extra={pending ? "seen before — grade it" : needsTopics ? "add topic and difficulty" : grade ? undefined : "logged"} />
           </span>
