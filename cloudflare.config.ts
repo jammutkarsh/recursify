@@ -14,6 +14,8 @@ export default defineConfig(({ mode }) => ({
     name: DEMO ? "recursify-demo" : "recursify",
     // Only the demo declares its domain; the main Worker's custom domain is set per deployment in the dashboard.
     ...(DEMO && { domains: ["demo.recursify.utkarshchourasia.in"] }), // same as DEMO_URL in src/lib/links.ts
+    // Run near the D1 database: each request makes several D1 round trips. The demo has no database.
+    ...(!DEMO && { placement: { mode: "smart" as const } }),
     entrypoint: "vinext/server/fetch-handler",
     compatibilityDate: "2026-10-18",
     compatibilityFlags: ["nodejs_compat"],
