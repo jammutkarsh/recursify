@@ -38,7 +38,7 @@ Work happens on `dev`. To release, tag a commit on `dev` and push the tag and `m
 git tag v1.2.0 && git push origin v1.2.0 'v1.2.0^{commit}:refs/heads/master'
 ```
 
-The push fails unless it fast-forwards `master`, and the `Release` workflow publishes the GitHub release notes. Cloudflare builds only `master`, so production and every fork's Sync fork only ever see tagged code. The weekly LeetCode catalog refresh commits to `dev` and ships with the next release; problems newer than the release's catalog are looked up live (`/api/lookup`) when someone logs them.
+The push fails unless it fast-forwards `master`, and the `Release` workflow publishes the GitHub release notes. Cloudflare builds only `master`, so production and every fork's Sync fork only ever see tagged code. The LeetCode catalog is data, not code, so it skips releases: a weekly Action publishes it to the `catalog` branch, and every deployment (forks included) reads it through jsDelivr. The copy bundled in each release (refreshed on `dev`) is only the fallback.
 
 ## Local development
 

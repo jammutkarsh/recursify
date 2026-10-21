@@ -17,10 +17,20 @@ export function unpack({ tags, problems }: Packed): Map<string, CatalogProblem> 
   }]));
 }
 
+// Refreshed weekly by .github/workflows/sync-catalog.yml on the data-only `catalog` branch, so every deployment
+// (forks too) sees new problems without a release. Bump v1 if the packed format ever changes.
+const LIVE_CATALOG = "https://cdn.jsdelivr.net/gh/jammutkarsh/recursify@catalog/v1/leetcode.json";
+
+const fetchPacked = async (src: string, ms: number) => {
+  const p = (await (await fetch(src, { signal: AbortSignal.timeout(ms) })).json()) as Packed;
+  if (!Array.isArray(p?.tags) || !Array.isArray(p?.problems) || p.problems.length < 3000) throw new Error("bad catalog");
+  return p;
+};
+
 let loading: Promise<Map<string, CatalogProblem>> | null = null;
-/** Browser: fetch the catalog once (a hashed, long-cached asset, ~110 KB gzipped), only when search needs it. */
+/** Browser: fetch the catalog once (~110 KB gzipped), only when search needs it. Live copy first, the release's bundled copy if that fails. */
 export const loadCatalog = () =>
-  (loading ??= fetch(catalogUrl).then((r) => r.json() as Promise<Packed>).then(unpack).catch((e) => { loading = null; throw e; }));
+  (loading ??= fetchPacked(LIVE_CATALOG, 5000).catch(() => fetchPacked(catalogUrl, 15000)).then(unpack).catch((e) => { loading = null; throw e; }));
 
 /** Worker: the catalog, imported on first use so other routes don't parse it. */
 let serverCatalog: Promise<Map<string, CatalogProblem>> | null = null;

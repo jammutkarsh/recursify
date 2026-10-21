@@ -1,21 +1,33 @@
 name: Sync LeetCode catalog
+# Weekly: publish the fresh catalog to the data-only `catalog` branch, which every deployment reads
+# through jsDelivr (no release or Sync fork needed), and refresh the copy bundled with the next release on dev.
 on:
   schedule: [{ cron: "0 3 * * 1" }] # Mondays 03:00 UTC
   workflow_dispatch:
 permissions:
   contents: write
-# Commits to dev, so the catalog ships with the next release instead of deploying on its own.
 jobs:
   sync:
     if: github.repository == 'jammutkarsh/recursify'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: { ref: dev }
+        with: { ref: dev, fetch-depth: 0 }
       - uses: oven-sh/setup-bun@v2
       - run: bun scripts/sync-catalog.ts
-      - run: |
+      - name: Configure git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Publish to the catalog branch
+        run: |
+          if git rev-parse -q --verify origin/catalog >/dev/null; then git worktree add -B catalog ../catalog origin/catalog; else git worktree add --orphan -b catalog ../catalog; fi
+          mkdir -p ../catalog/v1 && cp src/data/leetcode.json ../catalog/v1/leetcode.json
+          cd ../catalog && git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: LeetCode catalog $(date -u +%F)" && git push origin catalog
+          curl -fsS https://purge.jsdelivr.net/gh/jammutkarsh/recursify@catalog/v1/leetcode.json || true # jsDelivr caches branches ~12h
+      - name: Refresh the bundled fallback on dev
+        run: |
           git diff --quiet src/data/leetcode.json && exit 0
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "chore: sync LeetCode catalog" && git push
+          git commit -am "chore: sync LeetCode catalog" && git push origin dev
