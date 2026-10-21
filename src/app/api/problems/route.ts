@@ -2,7 +2,7 @@ import { authed, body, param } from "@/lib/api";
 import type { Problem } from "@/lib/catalog";
 import { deleteProblem, saveProblem } from "@/lib/store";
 
-export const POST = authed(async (req) => ({ id: await saveProblem(await body<Partial<Problem>>(req)) }));
+export const POST = authed(async (req) => ({ id: await saveProblem(await body<Partial<Problem> & { listId?: string }>(req)) }));
 
 export const PATCH = authed(async (req) => {
   const id = param(req, "id");

@@ -6,7 +6,7 @@ import { buildModel, type AppData, type Model } from "@/lib/derive";
 import type { Grade } from "@/lib/fsrs";
 import { DEMO, demoApi } from "@/lib/demo";
 import { loadCatalog } from "@/lib/leetcode";
-import type { ReviewRow, Settings } from "@/lib/settings";
+import { DEFAULT_LIST_ID, type ReviewRow, type Settings } from "@/lib/settings";
 
 export const localToday = () => {
   const d = new Date();
@@ -25,9 +25,13 @@ interface Ctx {
   logSolve: (problemId: string) => Promise<void>;
   grade: (problemId: string, grade: Grade) => Promise<void>;
   undo: () => Promise<void>;
-  addCustom: (p: Partial<Problem> & { title: string }) => Promise<string | null>;
+  addCustom: (p: Partial<Problem> & { title: string }, listId?: string) => Promise<string | null>;
   addLeetCode: (slug: string) => Promise<string | null>;
-  addToMyList: (problemId: string) => Promise<void>;
+  addToList: (listId: string, problemId: string) => Promise<void>;
+  removeFromList: (listId: string, problemId: string) => Promise<void>;
+  createList: (name: string) => Promise<string | null>;
+  renameList: (id: string, name: string) => Promise<void>;
+  deleteList: (id: string) => Promise<void>;
   updateProblem: (id: string, patch: Partial<Problem>) => Promise<void>;
   deleteProblem: (id: string) => Promise<void>;
   resetProblem: (id: string) => Promise<void>;
@@ -36,6 +40,14 @@ interface Ctx {
 }
 
 const AppDataContext = createContext<Ctx | null>(null);
+
+/** Data with `problemId` added to list `listId` (a no-op if it's already there). */
+const withItem = (d: AppData, listId: string, problemId: string): AppData => ({
+  ...d,
+  lists: d.lists.some((l) => l.id === listId)
+    ? d.lists.map((l) => (l.id === listId && !l.items.some((it) => it.id === problemId) ? { ...l, items: [...l.items, { id: problemId, section: null }] } : l))
+    : [...d.lists, { id: listId, name: "My list", items: [{ id: problemId, section: null }] }],
+});
 
 async function api<T = unknown>(path: string, init?: RequestInit & { json?: unknown }): Promise<T> {
   if (DEMO) return demoApi<T>(path, init);
@@ -105,11 +117,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     await optimistic((d) => ({ ...d, reviews: d.reviews.filter((r) => r.id !== reviewId) }), () => api(`/api/reviews?id=${reviewId}`, { method: "DELETE" }).then(() => {}));
   }, [optimistic, toast]);
 
-  const addCustom = useCallback(async (p: Partial<Problem> & { title: string }) => {
+  const addCustom = useCallback(async (p: Partial<Problem> & { title: string }, listId = DEFAULT_LIST_ID) => {
     try {
-      const { id } = await api<{ id: string }>("/api/problems", { method: "POST", json: p });
+      const { id } = await api<{ id: string }>("/api/problems", { method: "POST", json: { ...p, listId } });
       const problem: Problem = { id, title: p.title, url: p.url ?? null, difficulty: p.difficulty ?? "Medium", topics: p.topics ?? [], note: p.note ?? null, custom: true };
-      setData((d) => d && { ...d, customProblems: [...d.customProblems, problem], myList: [...d.myList, id] });
+      setData((d) => d && withItem({ ...d, customProblems: [...d.customProblems, problem] }, listId, id));
       return id;
     } catch (e) { setToast({ kind: "error", message: (e as Error).message }); return null; }
   }, []);
@@ -125,15 +137,42 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return addCustom(meta ?? { title: titleFromSlug(slug), url: `https://leetcode.com/problems/${slug}/` });
   }, [addCustom]);
 
-  const addToMyList = useCallback((problemId: string) =>
-    optimistic((d) => ({ ...d, myList: d.myList.includes(problemId) ? d.myList : [...d.myList, problemId] }), () => api("/api/problems", { method: "POST", json: { id: problemId } }).then(() => {})), [optimistic]);
+  const addToList = useCallback((listId: string, problemId: string) =>
+    optimistic((d) => withItem(d, listId, problemId), () => api("/api/lists/items", { method: "POST", json: { listId, problemId } }).then(() => {})), [optimistic]);
+
+  const removeFromList = useCallback((listId: string, problemId: string) =>
+    optimistic((d) => ({ ...d, lists: d.lists.map((l) => (l.id === listId ? { ...l, items: l.items.filter((it) => it.id !== problemId) } : l)) }),
+      () => api(`/api/lists/items?listId=${encodeURIComponent(listId)}&problemId=${encodeURIComponent(problemId)}`, { method: "DELETE" }).then(() => {})), [optimistic]);
+
+  const createList = useCallback(async (name: string) => {
+    try {
+      const { id } = await api<{ id: string }>("/api/lists", { method: "POST", json: { name } });
+      setData((d) => d && { ...d, lists: [...d.lists, { id, name: name.trim(), items: [] }] });
+      return id;
+    } catch (e) { setToast({ kind: "error", message: (e as Error).message }); return null; }
+  }, []);
+
+  const renameList = useCallback((id: string, name: string) =>
+    optimistic((d) => ({ ...d, lists: d.lists.map((l) => (l.id === id ? { ...l, name: name.trim() } : l)) }), () => api(`/api/lists?id=${encodeURIComponent(id)}`, { method: "PATCH", json: { name } }).then(() => {})), [optimistic]);
+
+  /** Deletes the list (its problems and their history stay) and stops following it. */
+  const deleteList = useCallback(async (id: string) => {
+    const followed = dataRef.current?.settings.followedLists ?? [];
+    await optimistic((d) => ({ ...d, lists: d.lists.filter((l) => l.id !== id) }), () => api(`/api/lists?id=${encodeURIComponent(id)}`, { method: "DELETE" }).then(() => {}));
+    if (followed.includes(id)) {
+      const next = followed.filter((x) => x !== id);
+      const followedLists = next.length ? next : ["neetcode150"];
+      setData((d) => d && { ...d, settings: { ...d.settings, followedLists } });
+      await api("/api/settings", { method: "PUT", json: { followedLists } }).catch(() => {});
+    }
+  }, [optimistic]);
 
   const updateProblem = useCallback((id: string, patch: Partial<Problem>) =>
     optimistic((d) => ({ ...d, customProblems: d.customProblems.map((p) => (p.id === id ? { ...p, ...patch } : p)) }), () => api(`/api/problems?id=${encodeURIComponent(id)}`, { method: "PATCH", json: patch }).then(() => {})), [optimistic]);
 
   const deleteProblem = useCallback((id: string) =>
     optimistic(
-      (d) => ({ ...d, reviews: d.reviews.filter((r) => r.problemId !== id), customProblems: d.customProblems.filter((p) => p.id !== id), myList: d.myList.filter((x) => x !== id) }),
+      (d) => ({ ...d, reviews: d.reviews.filter((r) => r.problemId !== id), customProblems: d.customProblems.filter((p) => p.id !== id), lists: d.lists.map((l) => ({ ...l, items: l.items.filter((it) => it.id !== id) })) }),
       () => api(`/api/problems?id=${encodeURIComponent(id)}`, { method: "DELETE" }).then(() => {}),
     ), [optimistic]);
 
@@ -145,8 +184,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const saveSettings = useCallback((patch: Partial<Settings>) =>
     optimistic((d) => ({ ...d, settings: { ...d.settings, ...patch } }), () => api("/api/settings", { method: "PUT", json: patch }).then(() => {})), [optimistic]);
 
-  const value = useMemo<Ctx>(() => ({ data, model, today, error, toast, setToast, logSolve, grade, undo, addCustom, addLeetCode, addToMyList, updateProblem, deleteProblem, resetProblem, saveSettings, reload }),
-    [data, model, today, error, toast, logSolve, grade, undo, addCustom, addLeetCode, addToMyList, updateProblem, deleteProblem, resetProblem, saveSettings, reload]);
+  const value = useMemo<Ctx>(() => ({ data, model, today, error, toast, setToast, logSolve, grade, undo, addCustom, addLeetCode, addToList, removeFromList, createList, renameList, deleteList, updateProblem, deleteProblem, resetProblem, saveSettings, reload }),
+    [data, model, today, error, toast, logSolve, grade, undo, addCustom, addLeetCode, addToList, removeFromList, createList, renameList, deleteList, updateProblem, deleteProblem, resetProblem, saveSettings, reload]);
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;
 }
 

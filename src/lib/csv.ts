@@ -33,12 +33,12 @@ const cell = (v: unknown) => {
 export const toCsv = (rows: unknown[][]) => rows.map((r) => r.map(cell).join(",")).join("\n") + "\n";
 
 /** Import rows: a CSV with a header row (needs a "title" or "url" column), or just LeetCode links, one per line. */
-export function importRecords(text: string): Record<string, string>[] {
+export function importRecords(text: string): { rows: Record<string, string>[]; header: boolean } {
   const firstLine = text.replace(/^\uFEFF/, "").trimStart().split(/\r?\n/, 1)[0] ?? "";
-  if (/leetcode\.com\/problems\//.test(firstLine)) return parseCsv(text.replace(/^\uFEFF/, "")).map((r) => ({ url: (r[0] ?? "").trim() })).filter((r) => r.url);
-  const records = csvRecords(text);
-  if (records.length && !("title" in records[0]) && !("url" in records[0])) throw new Error('No "title" or "url" column found.');
-  return records;
+  if (/leetcode\.com\/problems\//.test(firstLine)) return { header: false, rows: parseCsv(text.replace(/^\uFEFF/, "")).map((r) => ({ url: (r[0] ?? "").trim() })).filter((r) => r.url) };
+  const rows = csvRecords(text);
+  if (rows.length && !("title" in rows[0]) && !("url" in rows[0])) throw new Error('No "title" or "url" column found.');
+  return { header: true, rows };
 }
 
 /** Rows as objects keyed by lower-cased header. */

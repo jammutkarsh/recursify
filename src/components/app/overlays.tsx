@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useApp } from "@/context/AppData";
 import { BUILTIN_LISTS, builtinProblem, slugFromUrl, type Problem } from "@/lib/catalog";
 import { DEMO, exportCsv } from "@/lib/demo";
+import { RESET_PHRASES } from "@/lib/settings";
 import { loadCatalog, searchCatalog, type CatalogProblem } from "@/lib/leetcode";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
@@ -99,7 +100,8 @@ export function useKey(handler: (e: KeyboardEvent) => void) {
 }
 
 export function ListPicker({ onClose }: { onClose: () => void }) {
-  const { data, model, saveSettings } = useApp();
+  const { data, model, saveSettings, createList } = useApp();
+  const [naming, setNaming] = useState<string | null>(null);
   if (!data || !model) return null;
   const followed = new Set(data.settings.followedLists);
   const toggle = (id: string) => {
@@ -121,7 +123,20 @@ export function ListPicker({ onClose }: { onClose: () => void }) {
         );
       })}
       <div className="my-1 h-px bg-border" />
-      <Link href="/library?import=1" onClick={onClose} className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-primary hover:bg-primary-tint"><Plus className="size-4" />Import CSV to My list <Kbd className="ml-auto">U</Kbd></Link>
+      {naming === null ? (
+        <button type="button" onClick={() => setNaming("")} className="flex w-full items-center gap-2 px-3.5 py-2 text-sm font-medium text-primary hover:bg-primary-tint"><Plus className="size-4" />New list</button>
+      ) : (
+        <form className="flex items-center gap-2 px-3.5 py-1.5" onSubmit={async (e) => {
+          e.preventDefault();
+          const id = naming.trim() ? await createList(naming) : null;
+          if (id) { saveSettings({ followedLists: [...followed, id] }); setNaming(null); }
+        }}>
+          <input autoFocus value={naming} onChange={(e) => setNaming(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); setNaming(null); } }}
+            placeholder="List name" aria-label="New list name" maxLength={60} className="h-8 min-w-0 flex-1 rounded-md border border-border bg-card px-2.5 text-sm outline-none focus:border-primary" />
+          <button type="submit" className="rounded-md bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground">Create</button>
+        </form>
+      )}
+      <Link href="/library?import=1" onClick={onClose} className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-primary hover:bg-primary-tint"><Plus className="size-4" />Import CSV <Kbd className="ml-auto">U</Kbd></Link>
       <p className="px-3.5 pt-2 pb-3 text-xs text-muted-foreground">Reviews come from every list you follow. A problem in two lists shows up once.</p>
     </div>
   );
@@ -197,49 +212,53 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
         <Link href="/library?import=1" onClick={onClose} className="rounded-md border border-border px-3.5 py-2 text-[13px] font-semibold hover:bg-muted">Import CSV</Link>
         {DEMO ? null : <button type="button" onClick={signOut} className="rounded-md border border-border px-3.5 py-2 text-[13px] font-semibold hover:bg-muted">Sign out</button>}
       </div>
-      {DEMO ? null : <ResetData />}
+      {DEMO ? null : <><ResetData scope="progress" /><ResetData scope="all" /></>}
       <p className="text-center text-xs text-muted-foreground">Recursify · made by <a className="underline-offset-2 hover:underline" href="https://x.com/jammutkarsh">@jammutkarsh</a></p>
     </Overlay>
   );
 }
 
-const RESET_PHRASE = "delete all my data";
+const RESETS = {
+  progress: { title: "Reset progress", body: "Deletes every solve and review, so everything starts unsolved. Your lists, problems and settings stay.", button: "Reset progress", done: "Progress reset. Your lists are still here." },
+  all: { title: "Delete all data", body: "Deletes every review, custom problem, list and your settings.", button: "Delete everything", done: "All data deleted. Starting fresh." },
+} as const;
 
-function ResetData() {
+function ResetData({ scope }: { scope: keyof typeof RESETS }) {
   const { reload, setToast } = useApp();
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const ok = typed.trim().toLowerCase() === RESET_PHRASE;
+  const phrase = RESET_PHRASES[scope], copy = RESETS[scope];
+  const ok = typed.trim().toLowerCase() === phrase;
   const reset = async () => {
     setBusy(true); setError(null);
     try {
-      const res = await fetch("/api/data", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirm: typed }) });
+      const res = await fetch("/api/data", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ scope, confirm: typed }) });
       const out = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(out.error ?? "Reset failed");
       await reload();
       setOpen(false); setTyped("");
-      setToast({ kind: "info", message: "All progress deleted. Starting fresh." });
+      setToast({ kind: "info", message: copy.done });
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   };
   if (!open) return (
     <div className="flex items-center gap-3 rounded-lg border border-forgot/40 px-4 py-3">
-      <div className="flex-1"><p className="text-[13px] font-medium text-forgot-text">Reset all progress</p><p className="text-xs text-muted-foreground">Deletes every review, custom problem, My list and your settings.</p></div>
-      <button type="button" onClick={() => setOpen(true)} className="rounded-md border border-forgot px-3.5 py-2 text-[13px] font-semibold text-forgot-text transition hover:bg-forgot-tint">Reset…</button>
+      <div className="flex-1"><p className="text-[13px] font-medium text-forgot-text">{copy.title}</p><p className="text-xs text-muted-foreground">{copy.body}</p></div>
+      <button type="button" onClick={() => setOpen(true)} className="rounded-md border border-forgot px-3.5 py-2 text-[13px] font-semibold text-forgot-text transition hover:bg-forgot-tint">{scope === "all" ? "Delete…" : "Reset…"}</button>
     </div>
   );
   return (
     <div className="space-y-2.5 rounded-lg border border-forgot bg-forgot-tint px-4 py-3.5 animate-in fade-in-0 duration-200">
-      <p className="text-[13px] font-semibold text-forgot-text">This can&rsquo;t be undone.</p>
-      <p className="text-xs text-foreground-2">Export a CSV first if you might want your history back. To confirm, type <b className="font-mono">{RESET_PHRASE}</b> below.</p>
+      <p className="text-[13px] font-semibold text-forgot-text">{copy.title}: this can&rsquo;t be undone.</p>
+      <p className="text-xs text-foreground-2">{copy.body} Export a CSV first if you might want it back. To confirm, type <b className="font-mono">{phrase}</b> below.</p>
       <input autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && ok) reset(); }}
-        aria-label={`Type ${RESET_PHRASE} to confirm`} placeholder={RESET_PHRASE} spellCheck={false} autoComplete="off"
+        aria-label={`Type ${phrase} to confirm`} placeholder={phrase} spellCheck={false} autoComplete="off"
         className="w-full rounded-md border border-forgot/50 bg-card px-3 py-2 font-mono text-sm outline-none focus:border-forgot" />
       {error ? <p className="text-xs text-forgot-text" role="alert">{error}</p> : null}
       <div className="flex justify-end gap-2">
         <button type="button" onClick={() => { setOpen(false); setTyped(""); setError(null); }} className="rounded-md border border-border bg-card px-3.5 py-2 text-[13px] font-semibold">Cancel</button>
-        <button type="button" disabled={!ok || busy} onClick={reset} className="rounded-md bg-forgot px-3.5 py-2 text-[13px] font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-40">{busy ? "Deleting…" : "Delete everything"}</button>
+        <button type="button" disabled={!ok || busy} onClick={reset} className="rounded-md bg-forgot px-3.5 py-2 text-[13px] font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-40">{busy ? "Deleting…" : copy.button}</button>
       </div>
     </div>
   );

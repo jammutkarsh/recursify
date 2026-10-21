@@ -1,12 +1,12 @@
 // Pure view-model derivation: raw data in, everything the screens show out.
-import { BUILTIN_LISTS, builtinProblem, combineLists, customList, FOLLOWED_LIST_ID, sectionsOf, type ListDef, type Problem } from "./catalog";
+import { BUILTIN_LISTS, builtinProblem, combineLists, FOLLOWED_LIST_ID, sectionsOf, userList, type ListDef, type Problem } from "./catalog";
 import { daysBetween, dueDate, firstSolve, fromDay, previewIntervals, recallsToTarget, replay, retrievability, review, toDay, type Card, type Grade } from "./fsrs";
-import type { ReviewRow, Settings } from "./settings";
+import { DEFAULT_LIST_ID, type ReviewRow, type Settings, type UserList } from "./settings";
 
 export interface AppData {
   settings: Settings;
   customProblems: Problem[];
-  myList: string[];
+  lists: UserList[];
   reviews: ReviewRow[];
 }
 
@@ -27,9 +27,10 @@ export const CATCH_UP_BATCH = 20;
 export function buildModel(data: AppData, today: string) {
   const custom = new Map(data.customProblems.map((p) => [p.id, p]));
   const problem = (id: string): Problem | undefined => custom.get(id) ?? builtinProblem(id);
-  const myList = customList(data.myList.map(problem).filter(Boolean) as Problem[]);
-  const lists: ListDef[] = myList.sections.length ? [...BUILTIN_LISTS, myList] : BUILTIN_LISTS; // hide My list until it has a problem
-  const followed = combineLists(data.settings.followedLists.map((id) => lists.find((l) => l.id === id)).filter(Boolean) as ListDef[]);
+  // The user's lists; the default one stays hidden until it has a problem, lists they made always show.
+  const userLists = data.lists.map((l) => userList(l, problem)).filter((l) => l.id !== DEFAULT_LIST_ID || l.sections.length);
+  const lists: ListDef[] = [...BUILTIN_LISTS, ...userLists];
+  const followed = combineLists(data.settings.followedLists.map((id) => lists.find((l) => l.id === id)).filter(Boolean) as ListDef[], problem);
   const list = (id: string) => (id === FOLLOWED_LIST_ID ? followed : lists.find((l) => l.id === id) ?? followed);
   const { targetRecall } = data.settings;
 
@@ -88,7 +89,9 @@ export function buildModel(data: AppData, today: string) {
   // Slipping topic: the polygon section with the most due problems (≥2).
   const slipping = [...polygon].filter((s) => s.due >= 2).sort((a, b) => b.due - a.due)[0] ?? null;
 
-  return { problem, lists, list, tracked, queue, dueAll, overdue, catchUp, todayReviews, nextUp, polygon, polyList, slipping, firstSolvesToday };
+  /** User lists that hold this problem. */
+  const listsOf = (id: string) => data.lists.filter((l) => l.items.some((it) => it.id === id));
+  return { problem, lists, userLists, listsOf, list, tracked, queue, dueAll, overdue, catchUp, todayReviews, nextUp, polygon, polyList, slipping, firstSolvesToday };
 }
 
 export type Model = ReturnType<typeof buildModel>;

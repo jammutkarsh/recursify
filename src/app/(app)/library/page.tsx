@@ -11,6 +11,7 @@ import { useApp } from "@/context/AppData";
 import { FOLLOWED_LIST_ID, sectionsOf, type Problem } from "@/lib/catalog";
 import type { Tracked } from "@/lib/derive";
 import { daysBetween } from "@/lib/fsrs";
+import { DEFAULT_LIST_ID } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 
 const HEAT = ["var(--heat-0)", "var(--heat-1)", "var(--heat-2)", "var(--heat-3)", "var(--heat-4)"];
@@ -92,6 +93,7 @@ function Library() {
           options={[{ value: "all", label: "all" }, ...sectionsOf(list).map((s) => ({ value: s, label: s }))]} />
         <Picker label="Sort" prefix="Sort:" value={sort} onChange={(v) => setParam("sort", v)}
           options={[{ value: "weakest", label: "weakest recall" }, { value: "due", label: "next due" }, { value: "title", label: "title" }]} />
+        {list.custom ? <ListActions id={list.id} name={list.name} onDeleted={() => setParam("list", null)} /> : null}
         {q ? <button type="button" onClick={() => setParam("q", null)} className="rounded-md bg-primary-tint px-3 py-2 text-[13px] text-primary">Search: “{q}” ×</button> : null}
         <button type="button" onClick={() => setParam("import", "1")} className="ml-auto flex items-center gap-2 rounded-md border border-border px-3 py-2 text-[13px] font-semibold">Import CSV <Kbd>U</Kbd></button>
       </div>
@@ -140,24 +142,54 @@ function Library() {
           ))}
         </div>
       ) : (
-        <NoMatches q={q} topic={topic} listName={list.name} onClear={() => router.replace(path)} />
+        <NoMatches q={q} topic={topic} list={list.custom ? { id: list.id, name: list.name } : null} onImport={() => setParam("import", "1")} onClear={() => router.replace(path)} />
       )}
       {openId ? <ProblemDrawer id={openId} onClose={() => setParam("p", null)} /> : null}
-      {importing ? <ImportDialog onClose={() => setParam("import", null)} /> : null}
+      {importing ? <ImportDialog listId={list.custom ? list.id : undefined} onClose={() => setParam("import", null)} /> : null}
     </div>
   );
 }
 
-function NoMatches({ q, topic, listName, onClear }: { q: string; topic: string; listName: string; onClear: () => void }) {
+function NoMatches({ q, topic, list, onImport, onClear }: { q: string; topic: string; list: { id: string; name: string } | null; onImport: () => void; onClear: () => void }) {
   const { addCustom } = useApp();
   const router = useRouter();
+  const into = list ?? { id: DEFAULT_LIST_ID, name: "My list" };
   return (
     <div className="mx-auto mt-10 flex w-full max-w-md flex-col items-center gap-3 rounded-xl border border-border bg-card px-6 py-9 text-center">
       <p className="text-lg font-bold">{q ? `No problems match “${q}”` : "Nothing here yet"}</p>
-      <p className="text-[13px] text-muted-foreground">{q ? "Add it to your custom list and it joins your reviews." : `No problems in ${topic || listName}.`}</p>
-      {q ? <button type="button" onClick={async () => { const id = await addCustom({ title: q }); if (id) router.replace(`/library?list=custom&p=${id}`); }}
-        className="rounded-md bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground">+ Add “{q}” to My list</button> : null}
+      <p className="text-[13px] text-muted-foreground">{q ? `Add it to ${into.name} and it joins your reviews.` : list && !topic ? "Import a CSV into this list, or open any problem and use Lists → Add to list." : `No problems in ${topic || into.name}.`}</p>
+      {q ? <button type="button" onClick={async () => { const id = await addCustom({ title: q }, into.id); if (id) router.replace(`/library?list=${encodeURIComponent(into.id)}&p=${id}`); }}
+        className="rounded-md bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground">+ Add “{q}” to {into.name}</button>
+        : list && !topic ? <button type="button" onClick={onImport} className="flex items-center gap-2 rounded-md bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground">Import CSV <Kbd onPrimary>U</Kbd></button> : null}
       <button type="button" onClick={onClear} className="flex items-center gap-2 text-[13px] text-muted-foreground">Clear filters <Kbd>Esc</Kbd></button>
     </div>
+  );
+}
+
+/** Rename or delete one of the user's lists (the default list can be renamed, not deleted). */
+function ListActions({ id, name, onDeleted }: { id: string; name: string; onDeleted: () => void }) {
+  const { renameList, deleteList } = useApp();
+  const [mode, setMode] = useState<null | "rename" | "delete">(null);
+  const [value, setValue] = useState(name);
+  const btn = "rounded-md border border-border px-3 py-2 text-[13px] font-semibold hover:bg-muted";
+  if (mode === "rename") return (
+    <form className="flex items-center gap-2" onSubmit={async (e) => { e.preventDefault(); if (value.trim() && value.trim() !== name) await renameList(id, value).catch(() => {}); setMode(null); }}>
+      <input autoFocus value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); setMode(null); } }}
+        aria-label="List name" maxLength={60} className="h-9 w-56 rounded-md border border-primary bg-card px-3 text-[13px] outline-none" />
+      <button type="submit" className="rounded-md bg-primary px-3 py-2 text-[13px] font-semibold text-primary-foreground">Save</button>
+    </form>
+  );
+  if (mode === "delete") return (
+    <span className="flex items-center gap-2 text-[13px]">
+      <span className="text-muted-foreground">Delete “{name}”? Its problems and history stay.</span>
+      <button type="button" onClick={async () => { await deleteList(id).catch(() => {}); onDeleted(); }} className="rounded-md bg-forgot px-3 py-2 font-semibold text-white">Delete list</button>
+      <button type="button" onClick={() => setMode(null)} className={btn}>Cancel</button>
+    </span>
+  );
+  return (
+    <span className="flex items-center gap-2">
+      <button type="button" onClick={() => { setValue(name); setMode("rename"); }} className={btn}>Rename</button>
+      {id !== DEFAULT_LIST_ID ? <button type="button" onClick={() => setMode("delete")} className={cn(btn, "text-forgot-text")}>Delete</button> : null}
+    </span>
   );
 }

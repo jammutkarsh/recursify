@@ -3,7 +3,7 @@ import { buildModel, historyDetails, progress, type AppData } from "./derive";
 import { DEFAULT_SETTINGS } from "./settings";
 
 const data = (reviews: AppData["reviews"], extra: Partial<AppData> = {}): AppData => ({
-  settings: DEFAULT_SETTINGS, customProblems: [], myList: [], reviews, ...extra,
+  settings: DEFAULT_SETTINGS, customProblems: [], lists: [], reviews, ...extra,
 });
 
 test("queue holds due problems, most forgotten first, and drops ones reviewed today", () => {
@@ -37,7 +37,7 @@ test("catch-up kicks in past the overdue threshold and pauses new problems", () 
 test("custom problems live in My list; progress counts unique solves in followed lists", () => {
   const d = data(
     [{ id: 1, problemId: "two-sum", date: "2026-10-01", grade: null }, { id: 2, problemId: "custom-x", date: "2026-10-02", grade: null }],
-    { customProblems: [{ id: "custom-x", title: "Rate limiter", url: null, difficulty: "Hard", topics: ["System Design"], custom: true }], myList: ["custom-x"], settings: { ...DEFAULT_SETTINGS, followedLists: ["neetcode150", "blind75", "custom"] } },
+    { customProblems: [{ id: "custom-x", title: "Rate limiter", url: null, difficulty: "Hard", topics: ["System Design"], custom: true }], lists: [{ id: "custom", name: "My list", items: [{ id: "custom-x", section: null }] }], settings: { ...DEFAULT_SETTINGS, followedLists: ["neetcode150", "blind75", "custom"] } },
   );
   const m = buildModel(d, "2026-10-20");
   expect(m.list("custom").sections).toEqual([{ id: "custom-x", section: "System Design" }]);

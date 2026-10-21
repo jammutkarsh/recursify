@@ -2,6 +2,7 @@ import blind75 from "../data/blind75.json";
 import leetcode75 from "../data/leetcode75.json";
 import neetcode150 from "../data/neetcode150.json";
 import type { Difficulty } from "./fsrs";
+import type { UserList } from "./settings";
 
 export interface Problem {
   id: string; // LeetCode slug, or custom-<uuid>
@@ -45,12 +46,15 @@ export const BUILTIN_LISTS: ListDef[] = [
 export const builtinProblem = (id: string) => problems.get(id);
 export const builtinByTitle = (title: string) => [...problems.values()].find((p) => p.title.toLowerCase() === title.toLowerCase());
 
-/** The user's custom list, shaped like a built-in one: grouped into the same topics as the built-in lists. */
-export const customList = (custom: Problem[]): ListDef => ({
-  id: CUSTOM_LIST_ID,
-  name: "My list",
+/** A list the user made, shaped like a built-in one and grouped into the same topics, so the polygon stays small. */
+export const userList = (list: UserList, problem: (id: string) => Problem | undefined): ListDef => ({
+  id: list.id,
+  name: list.name,
   custom: true,
-  sections: inTopicOrder(custom.map((p) => ({ id: p.id, section: topicOf(p.id, p.topics[0] ?? UNCATEGORISED) }))),
+  sections: inTopicOrder(list.items.flatMap((it) => {
+    const p = problem(it.id);
+    return p ? [{ id: it.id, section: topicOf(it.id, it.section ?? p.topics[0] ?? UNCATEGORISED, p.topics) }] : [];
+  })),
 });
 
 // Topic names differ per list; map them onto NeetCode's so one polygon can combine lists.
@@ -71,6 +75,10 @@ const ALIASES: Record<string, string> = {
   "hash table": "Arrays & Hashing", "string": "Arrays & Hashing", "sorting": "Arrays & Hashing", "binary tree": "Trees",
   "heap (priority queue)": "Heap/Priority Queue", "graph theory": "Graphs", "depth-first search": "Graphs", "breadth-first search": "Graphs",
   "union find": "Graphs", "union-find": "Graphs", "topological sort": "Advanced Graphs", "shortest path": "Advanced Graphs", "minimum spanning tree": "Advanced Graphs",
+  // Common pattern names (e.g. "Grokking"-style lists)
+  "string matching": "Arrays & Hashing", "cyclic sort": "Arrays & Hashing", "tree dfs": "Trees", "tree bfs": "Trees", "recursion": "Backtracking",
+  "matrix": "Math & Geometry", "fast & slow pointers": "Linked Lists", "fast and slow pointers": "Linked Lists", "knapsack": "2-D DP", "knapsack problem": "2-D DP",
+  "monotonic queue": "Sliding Window", "two heaps": "Heap/Priority Queue", "k-way merge": "Heap/Priority Queue", "top k elements": "Heap/Priority Queue",
 };
 const CANON = new Map(NEETCODE_ORDER.map((n) => [n.toLowerCase(), n]));
 export const canonicalTopic = (name: string) => CANON.get(name.toLowerCase()) ?? ALIASES[name.toLowerCase()] ?? name;
@@ -78,9 +86,18 @@ export const canonicalTopic = (name: string) => CANON.get(name.toLowerCase()) ??
 export const FOLLOWED_LIST_ID = "followed";
 const UNCATEGORISED = "Uncategorised";
 
-/** A problem's canonical topic: NeetCode's section when it's in NeetCode 150, else its own topic mapped onto NeetCode's names. */
 const NEETCODE_SECTION = new Map(BUILTIN_LISTS[0].sections.map((s) => [s.id, s.section]));
-const topicOf = (id: string, section: string) => NEETCODE_SECTION.get(id) ?? canonicalTopic(section);
+const isNeetCodeTopic = (t: string) => NEETCODE_ORDER.includes(t);
+/**
+ * A problem's topic among NeetCode's 18: its NeetCode 150 section; else the list's topic mapped onto NeetCode's names;
+ * else the first of its own tags that maps (tags run most specific first). Only a topic nothing maps keeps its own name.
+ */
+const topicOf = (id: string, section: string, tags: string[] = []) => {
+  const nc = NEETCODE_SECTION.get(id);
+  if (nc) return nc;
+  if (section === UNCATEGORISED && !tags.length) return UNCATEGORISED;
+  return [section, ...tags].map(canonicalTopic).find(isNeetCodeTopic) ?? section;
+};
 /** NeetCode's topic order; other topics after it, alphabetically, and Uncategorised last. Stable within a topic. */
 const inTopicOrder = (sections: ListDef["sections"]) => {
   const rank = (t: string) => { const i = NEETCODE_ORDER.indexOf(t); return i >= 0 ? i : t === UNCATEGORISED ? Infinity : NEETCODE_ORDER.length; };
@@ -88,9 +105,9 @@ const inTopicOrder = (sections: ListDef["sections"]) => {
 };
 
 /** One list made of every followed list: each problem once, under its canonical topic. */
-export function combineLists(lists: ListDef[]): ListDef {
+export function combineLists(lists: ListDef[], problem: (id: string) => Problem | undefined = builtinProblem): ListDef {
   const seen = new Map<string, string>();
-  for (const l of lists) for (const s of l.sections) if (!seen.has(s.id)) seen.set(s.id, topicOf(s.id, s.section));
+  for (const l of lists) for (const s of l.sections) if (!seen.has(s.id)) seen.set(s.id, topicOf(s.id, s.section, problem(s.id)?.topics));
   return { id: FOLLOWED_LIST_ID, name: "All followed lists", sections: inTopicOrder([...seen].map(([id, section]) => ({ id, section }))) };
 }
 

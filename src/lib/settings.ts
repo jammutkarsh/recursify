@@ -21,5 +21,7 @@ export const DEFAULT_SETTINGS: Settings = {
 export interface UserList { id: string; name: string; items: { id: string; section: string | null }[] }
 /** The default list (formerly "My list"): can be renamed, not deleted. */
 export const DEFAULT_LIST_ID = "custom";
+/** Typed confirmations for Settings → Reset. */
+export const RESET_PHRASES = { progress: "reset my progress", all: "delete all my data" } as const;
 
 export interface ReviewRow { id: number; problemId: string; date: string; grade: Grade | null }

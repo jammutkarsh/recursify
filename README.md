@@ -6,9 +6,9 @@ Recursify brings each LeetCode problem back right before you'd forget it, and sh
 
 - **FSRS spaced repetition.** Grade each re-solve 1–4 (Forgot, Struggled, Recalled, Instant) and the schedule adapts to you. A first solve is seeded by difficulty: Easy about 3 days, Medium 2, Hard 1.
 - **Topic polygon.** One wedge per topic of your list, greener as you solve more.
-- **Lists.** Blind 75, LeetCode 75 and NeetCode 150 are built in, plus My list for your own problems, LeetCode or not. Follow several at once.
+- **Lists.** Blind 75, LeetCode 75 and NeetCode 150 are built in. Make as many of your own as you like (LeetCode problems or anything else), and follow several at once. Every list is grouped into the same 18 NeetCode topics, so the polygon stays readable however many you follow.
 - **Keyboard-first.** `J`/`K` move, `1`–`4` grade, `A` log a solve, `/` search, `?` shows every shortcut.
-- **CSV import and export** (`title, url, difficulty, topic, note, reviewed_at, grade`). A LeetCode link alone is enough (even a plain list of links, one per line): title, difficulty and topic come from the bundled catalog of every LeetCode problem. `topic` sets the section in My list; LeetCode and NeetCode topic names are grouped like the built-in lists.
+- **CSV import and export** (`title, url, difficulty, topic, note, reviewed_at, grade, list`). A LeetCode link alone is enough (even a plain list of links, one per line): title, difficulty and topics come from the bundled catalog of every LeetCode problem. Import into any list, or name lists in the `list` column; `topic` sets the problem's section there. Export writes every list, so a re-import rebuilds them.
 
 Not affiliated with LeetCode.
 

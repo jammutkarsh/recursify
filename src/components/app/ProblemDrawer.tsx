@@ -1,13 +1,13 @@
 "use client";
 
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, X } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "@/context/AppData";
 import { historyDetails } from "@/lib/derive";
 import { daysBetween, fromDay, retrievability, toDay, type Difficulty } from "@/lib/fsrs";
 import { cn } from "@/lib/utils";
 import { useKey } from "./overlays";
-import { describeDue, diffText, GRADES, Kbd } from "./ui";
+import { describeDue, diffText, GRADES, Kbd, Picker } from "./ui";
 
 const fmt = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
@@ -22,7 +22,8 @@ export function ProblemDrawer({ id, onClose }: { id: string; onClose: () => void
   if (!p) return null;
   const t = model.tracked.get(id);
   const details = t ? historyDetails(t) : [];
-  const inMyList = data.myList.includes(id);
+  const inLists = model.listsOf(id);
+  const addable = data.lists.filter((l) => !inLists.includes(l));
   const section = model.polyList.sections.find((s) => s.id === id)?.section ?? p.topics[0];
 
   return (
@@ -42,6 +43,18 @@ export function ProblemDrawer({ id, onClose }: { id: string; onClose: () => void
             {p.note ? <p className="mt-2 text-sm text-foreground-2">{p.note}</p> : null}
           </div>
         )}
+
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-[13px] font-medium">Lists</span>
+          {inLists.map((l) => (
+            <span key={l.id} className="flex items-center gap-1 rounded-[6px] bg-primary-tint py-0.5 pr-1 pl-2 text-xs font-semibold text-primary">
+              {l.name}<button type="button" aria-label={`Remove from ${l.name}`} onClick={() => app.removeFromList(l.id, id)} className="rounded px-1 hover:bg-primary/15"><X className="size-3" /></button>
+            </span>
+          ))}
+          {addable.length ? <Picker label="Add to list" value="" onChange={(v) => v && app.addToList(v, id)} className="h-7 text-xs"
+            options={[{ value: "", label: "+ Add to list" }, ...addable.map((l) => ({ value: l.id, label: l.name }))]} /> : null}
+          {!inLists.length && !addable.length ? <span className="text-xs text-muted-foreground">—</span> : null}
+        </div>
 
         {t ? (
           <>
@@ -78,16 +91,15 @@ export function ProblemDrawer({ id, onClose }: { id: string; onClose: () => void
 
         <div className="mt-auto flex flex-wrap items-center gap-2">
           {p.custom && !editing ? <button type="button" onClick={() => setEditing(true)} className="rounded-md border border-border px-3.5 py-2 text-[13px] font-semibold">Edit</button> : null}
-          {!inMyList ? <button type="button" onClick={() => app.addToMyList(id)} className="rounded-md border border-border px-3.5 py-2 text-[13px] font-semibold">Add to My list</button> : null}
           {t ? (confirm === "reset"
             ? <button type="button" onClick={() => { app.resetProblem(id); setConfirm(null); }} className="rounded-md bg-struggled px-3.5 py-2 text-[13px] font-semibold text-white">Confirm reset</button>
             : <button type="button" onClick={() => setConfirm("reset")} className="rounded-md border border-border px-3.5 py-2 text-[13px] font-semibold">Reset</button>) : null}
           <span className="flex-1" />
-          {(t || p.custom || inMyList) ? (confirm === "delete"
+          {(t || p.custom || inLists.length) ? (confirm === "delete"
             ? <button type="button" onClick={() => { app.deleteProblem(id); onClose(); }} className="rounded-md bg-forgot px-3.5 py-2 text-[13px] font-semibold text-white">Delete for good</button>
             : <button type="button" onClick={() => setConfirm("delete")} className="rounded-md border border-forgot px-3.5 py-2 text-[13px] font-semibold text-forgot-text">Delete</button>) : null}
         </div>
-        {confirm ? <p className="-mt-3 text-xs text-muted-foreground">{confirm === "reset" ? "Clears its history and starts over as a first solve today." : p.custom ? "Removes the problem and its history." : "Removes its history and takes it off My list."}</p> : null}
+        {confirm ? <p className="-mt-3 text-xs text-muted-foreground">{confirm === "reset" ? "Clears its history and starts over as a first solve today." : p.custom ? "Removes the problem and its history." : "Removes its history and takes it off all your lists."}</p> : null}
       </aside>
     </div>
   );

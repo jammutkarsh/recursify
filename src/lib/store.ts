@@ -1,23 +1,12 @@
 // Server-side data access. Every function assumes the caller already checked auth.
-import { builtinByTitle, builtinProblem, slugFromUrl, titleFromSlug, type Problem } from "./catalog";
-import { lookupLeetCode, serverCatalogLookup } from "./leetcode";
-import { importRecords, toCsv } from "./csv";
+import { builtinProblem, type Problem } from "./catalog";
 import { db } from "./db";
-import type { Difficulty, Grade } from "./fsrs";
-import { DEFAULT_SETTINGS, type ReviewRow, type Settings } from "./settings";
+import type { Grade } from "./fsrs";
+import { lookupLeetCode, serverCatalogLookup } from "./leetcode";
+import { DEFAULT_LIST_ID, DEFAULT_SETTINGS, RESET_PHRASES, type ReviewRow, type Settings, type UserList } from "./settings";
+import { asDifficulty, asGrade, exportCsv as toExportCsv, isDate, planImport, slugsToResolve, type ImportOp, type Meta, type TransferState } from "./transfer";
 
 export { DEFAULT_SETTINGS, type ReviewRow, type Settings };
-
-const DIFFS = ["Easy", "Medium", "Hard"];
-const asDifficulty = (v: unknown): Difficulty => (DIFFS.includes(String(v)) ? (v as Difficulty) : "Medium");
-const asGrade = (v: unknown): Grade | null => {
-  const s = String(v ?? "").trim().toLowerCase();
-  if (!s) return null;
-  const n = ({ forgot: 1, struggled: 2, recalled: 3, instant: 4 } as Record<string, number>)[s] ?? Number(s);
-  if (![1, 2, 3, 4].includes(n)) throw new Error(`Invalid grade "${v}"`);
-  return n as Grade;
-};
-const isDate = (s: unknown): s is string => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
 
 const rowToProblem = (r: Record<string, unknown>): Problem => ({
   id: r.id as string, title: r.title as string, url: (r.url as string) ?? null,
@@ -26,18 +15,23 @@ const rowToProblem = (r: Record<string, unknown>): Problem => ({
 
 export async function loadAll() {
   const d = await db();
-  const [s, c, r, m] = await d.batch([
+  const [s, c, r, l, i] = await d.batch([
     d.prepare("SELECT key, value FROM settings"),
     d.prepare("SELECT * FROM custom_problems ORDER BY created_at"),
     d.prepare("SELECT id, problem_id, reviewed_at, grade FROM reviews ORDER BY reviewed_at, id"),
-    d.prepare("SELECT problem_id FROM my_list ORDER BY added_at"),
+    d.prepare("SELECT id, name FROM lists ORDER BY created_at, rowid"),
+    d.prepare("SELECT list_id, problem_id, section FROM list_items ORDER BY rowid"),
   ]);
   const settings = { ...DEFAULT_SETTINGS };
   for (const { key, value } of s.results as { key: string; value: string }[]) if (key in settings) (settings as Record<string, unknown>)[key] = JSON.parse(value);
+  const lists: UserList[] = (l.results as { id: string; name: string }[]).map(({ id, name }) => ({ id, name, items: [] }));
+  if (!lists.some((x) => x.id === DEFAULT_LIST_ID)) lists.unshift({ id: DEFAULT_LIST_ID, name: "My list", items: [] });
+  const byId = new Map(lists.map((x) => [x.id, x]));
+  for (const it of i.results as { list_id: string; problem_id: string; section: string | null }[]) byId.get(it.list_id)?.items.push({ id: it.problem_id, section: it.section });
   return {
     settings,
     customProblems: (c.results as Record<string, unknown>[]).map(rowToProblem),
-    myList: (m.results as { problem_id: string }[]).map((x) => x.problem_id),
+    lists,
     reviews: (r.results as Record<string, unknown>[]).map((x) => ({ id: x.id as number, problemId: x.problem_id as string, date: x.reviewed_at as string, grade: (x.grade as Grade) ?? null })),
   };
 }
@@ -55,28 +49,86 @@ export async function deleteReviews({ id, problemId }: { id?: number; problemId?
   else if (problemId) await d.prepare("DELETE FROM reviews WHERE problem_id = ?").bind(problemId).run();
 }
 
-export async function addToMyList(problemId: string) {
-  const d = await db();
-  await d.prepare("INSERT OR IGNORE INTO my_list (problem_id, added_at) VALUES (?, ?)").bind(problemId, new Date().toISOString()).run();
+// ——— Lists ———
+
+const listName = (name: unknown) => {
+  const n = String(name ?? "").trim();
+  if (!n || n.length > 60) throw new Error("List name must be 1–60 characters");
+  return n;
+};
+async function assertNewName(d: D1Database, name: string, except = "") {
+  const clash = await d.prepare("SELECT id FROM lists WHERE lower(name) = lower(?) AND id != ?").bind(name, except).first();
+  if (clash) throw new Error(`You already have a list called "${name}"`);
 }
 
-/** Statements that create a custom problem and put it on My list. */
-const insertCustom = (d: D1Database, id: string, input: Partial<Problem> & { title: string }, now: string) => [
-  d.prepare("INSERT INTO custom_problems (id, title, url, difficulty, topics, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
-    .bind(id, input.title, input.url ?? null, asDifficulty(input.difficulty), JSON.stringify(input.topics ?? []), input.note ?? null, now),
-  d.prepare("INSERT OR IGNORE INTO my_list (problem_id, added_at) VALUES (?, ?)").bind(id, now),
-];
+export async function createList(name: unknown) {
+  const d = await db();
+  const n = listName(name);
+  await assertNewName(d, n);
+  const id = `list-${crypto.randomUUID()}`;
+  await d.prepare("INSERT INTO lists (id, name, created_at) VALUES (?, ?, ?)").bind(id, n, new Date().toISOString()).run();
+  return id;
+}
 
-/** Create (no id) or update a custom problem. `{ id: <builtin slug> }` alone adds a built-in problem to My list. */
-export async function saveProblem(input: Partial<Problem> & { title?: string }, id?: string) {
+export async function renameList(id: string, name: unknown) {
+  const d = await db();
+  const n = listName(name);
+  await assertNewName(d, n, id);
+  await d.prepare("INSERT INTO lists (id, name, created_at) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name").bind(id, n, new Date().toISOString()).run();
+}
+
+/** Deletes the list and its memberships; the problems (and their history) stay. The default list can't be deleted. */
+export async function deleteList(id: string) {
+  if (id === DEFAULT_LIST_ID) throw new Error("The default list can't be deleted; rename it instead");
+  const d = await db();
+  await d.batch([d.prepare("DELETE FROM list_items WHERE list_id = ?").bind(id), d.prepare("DELETE FROM lists WHERE id = ?").bind(id)]);
+}
+
+const itemStatement = (d: D1Database, listId: string, problemId: string, section: string | null, now: string) =>
+  d.prepare("INSERT INTO list_items (list_id, problem_id, section, added_at) VALUES (?, ?, ?, ?) ON CONFLICT(list_id, problem_id) DO UPDATE SET section = COALESCE(excluded.section, list_items.section)")
+    .bind(listId, problemId, section, now);
+
+async function assertList(d: D1Database, listId: string) {
+  if (listId !== DEFAULT_LIST_ID && !(await d.prepare("SELECT 1 FROM lists WHERE id = ?").bind(listId).first())) throw new Error("No such list");
+}
+
+export async function addToList(listId: string, problemId: string, section: string | null = null) {
+  const d = await db();
+  await assertList(d, listId);
+  await d.batch([...ensureDefaultList(d, listId), itemStatement(d, listId, problemId, section, new Date().toISOString())]);
+}
+
+export async function removeFromList(listId: string, problemId: string) {
+  const d = await db();
+  await d.prepare("DELETE FROM list_items WHERE list_id = ? AND problem_id = ?").bind(listId, problemId).run();
+}
+
+/** The default list's row may be missing after a full reset; recreate it before adding to it. */
+const ensureDefaultList = (d: D1Database, listId: string) =>
+  listId === DEFAULT_LIST_ID ? [d.prepare("INSERT OR IGNORE INTO lists (id, name, created_at) VALUES (?, 'My list', ?)").bind(DEFAULT_LIST_ID, new Date().toISOString())] : [];
+
+// ——— Problems ———
+
+const insertCustom = (d: D1Database, p: Problem, now: string) =>
+  d.prepare("INSERT INTO custom_problems (id, title, url, difficulty, topics, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .bind(p.id, p.title, p.url ?? null, asDifficulty(p.difficulty), JSON.stringify(p.topics ?? []), p.note ?? null, now);
+
+/**
+ * Create (no id) or update a custom problem. New problems join `listId` (default list if omitted).
+ * `{ id: <builtin slug> }` alone adds that built-in problem to the list.
+ */
+export async function saveProblem(input: Partial<Problem> & { title?: string; listId?: string }, id?: string) {
   const title = input.title?.trim();
-  if (!id && input.id && builtinProblem(input.id)) { await addToMyList(input.id); return input.id; }
+  const listId = input.listId || DEFAULT_LIST_ID;
+  if (!id && input.id && builtinProblem(input.id)) { await addToList(listId, input.id); return input.id; }
   if (!id && !title) throw new Error("title is required");
   const d = await db();
   if (!id) {
-    const newId = `custom-${crypto.randomUUID()}`;
-    await d.batch(insertCustom(d, newId, { ...input, title }, new Date().toISOString()));
-    return newId;
+    await assertList(d, listId);
+    const now = new Date().toISOString();
+    const p: Problem = { id: `custom-${crypto.randomUUID()}`, title: title!, url: input.url ?? null, difficulty: asDifficulty(input.difficulty), topics: input.topics ?? [], note: input.note ?? null, custom: true };
+    await d.batch([...ensureDefaultList(d, listId), insertCustom(d, p, now), itemStatement(d, listId, p.id, null, now)]);
+    return p.id;
   }
   const sets: string[] = [], vals: unknown[] = [];
   if (title) { sets.push("title = ?"); vals.push(title); }
@@ -88,12 +140,13 @@ export async function saveProblem(input: Partial<Problem> & { title?: string }, 
   return id;
 }
 
+/** Removes a problem's history and every list membership (and the problem itself if it's custom). */
 export async function deleteProblem(id: string) {
   const d = await db();
   await d.batch([
     d.prepare("DELETE FROM reviews WHERE problem_id = ?").bind(id),
     d.prepare("DELETE FROM custom_problems WHERE id = ?").bind(id),
-    d.prepare("DELETE FROM my_list WHERE problem_id = ?").bind(id),
+    d.prepare("DELETE FROM list_items WHERE problem_id = ?").bind(id),
   ]);
 }
 
@@ -104,21 +157,10 @@ export async function saveSettings(patch: Partial<Settings>) {
   if (known.length) await d.batch(known.map(([k, v]) => d.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(k, JSON.stringify(v))));
 }
 
-const GRADE_NAMES = ["", "Forgot", "Struggled", "Recalled", "Instant"];
+// ——— CSV ———
 
 export async function exportCsv() {
-  const { customProblems, reviews, myList } = await loadAll();
-  const custom = new Map(customProblems.map((p) => [p.id, p]));
-  const meta = (id: string) => custom.get(id) ?? builtinProblem(id);
-  const rows: unknown[][] = [["title", "url", "difficulty", "topic", "note", "reviewed_at", "grade"]];
-  const seen = new Set<string>();
-  for (const r of reviews) {
-    const p = meta(r.problemId); if (!p) continue;
-    seen.add(p.id);
-    rows.push([p.title, p.url ?? "", p.difficulty, p.topics.join("; "), p.note ?? "", r.date, r.grade ? GRADE_NAMES[r.grade] : ""]);
-  }
-  for (const id of myList) { const p = meta(id); if (p && !seen.has(id)) rows.push([p.title, p.url ?? "", p.difficulty, p.topics.join("; "), p.note ?? "", "", ""]); }
-  return toCsv(rows);
+  return toExportCsv(await loadAll());
 }
 
 // Links the catalog doesn't know get a live lookup, capped so one import stays inside the Worker's subrequest limit
@@ -127,65 +169,38 @@ const LIVE_LOOKUPS = 10;
 // Writes go in batches (one D1 round trip and one transaction each), not one query per row.
 const BATCH = 200;
 
-/** Import rows (title or LeetCode url, difficulty, topic, note, reviewed_at, grade). Reviews are just appended; FSRS replays on read. */
-export async function importCsv(text: string) {
-  const records = importRecords(text);
-  const { customProblems, reviews, myList } = await loadAll();
-  const myListSet = new Set(myList);
-  const byTitle = new Map(customProblems.map((p) => [p.title.toLowerCase(), p.id]));
-  const bySlug = new Map(customProblems.flatMap((p) => { const s = p.url && slugFromUrl(p.url); return s ? [[s, p.id] as const] : []; }));
-  const existing = new Set(reviews.map((r) => `${r.problemId}|${r.date}|${r.grade ?? ""}`));
-  const result = { problems: 0, reviews: 0, skipped: 0, errors: [] as string[] };
-
-  // Metadata for new links: the bundled catalog first, then a few live lookups in parallel.
-  const meta = new Map<string, Omit<Problem, "id"> | null>();
-  for (const r of records) {
-    const slug = r.url ? slugFromUrl(r.url) : null;
-    if (slug && !builtinProblem(slug) && !bySlug.has(slug) && !meta.has(slug)) meta.set(slug, (await serverCatalogLookup(slug)) ?? null);
-  }
+/** Resolve LeetCode metadata for new links: the bundled catalog, then a few live lookups in parallel. */
+export async function resolveMeta(text: string, state: TransferState) {
+  const meta = new Map<string, Meta | null>();
+  for (const slug of slugsToResolve(text, state)) meta.set(slug, (await serverCatalogLookup(slug)) ?? null);
   const live = [...meta].filter(([, m]) => !m).slice(0, LIVE_LOOKUPS).map(([slug]) => slug);
   await Promise.all(live.map(async (slug) => meta.set(slug, await lookupLeetCode(slug))));
-
-  const d = await db();
-  const now = new Date().toISOString();
-  const writes: D1PreparedStatement[] = [];
-  for (const [i, rec] of records.entries()) {
-    try {
-      const slug = rec.url ? slugFromUrl(rec.url) : null;
-      if (!rec.title && !slug) throw new Error("needs a title or a LeetCode link");
-      if (rec.reviewed_at && !isDate(rec.reviewed_at)) throw new Error("reviewed_at must be YYYY-MM-DD");
-      const grade = rec.reviewed_at ? asGrade(rec.grade) : null;
-      let id = slug && builtinProblem(slug) ? slug : (slug && bySlug.get(slug)) || (rec.title ? builtinByTitle(rec.title)?.id ?? byTitle.get(rec.title.toLowerCase()) : undefined);
-      if (!id) {
-        const known = slug ? meta.get(slug) : null;
-        const title = rec.title || known?.title || titleFromSlug(slug!);
-        id = `custom-${crypto.randomUUID()}`;
-        writes.push(...insertCustom(d, id, { title, url: rec.url || null, difficulty: (rec.difficulty || known?.difficulty) as Difficulty,
-          topics: rec.topic ? rec.topic.split(";").map((t) => t.trim()).filter(Boolean) : (known?.topics ?? []), note: rec.note || null }, now));
-        byTitle.set(title.toLowerCase(), id); if (slug) bySlug.set(slug, id); result.problems++;
-      } else if (!rec.reviewed_at && !myListSet.has(id)) { // bare rows = list membership; review rows are history only
-        writes.push(d.prepare("INSERT OR IGNORE INTO my_list (problem_id, added_at) VALUES (?, ?)").bind(id, now)); result.problems++;
-      }
-      myListSet.add(id);
-      if (rec.reviewed_at) {
-        const key = `${id}|${rec.reviewed_at}|${grade ?? ""}`;
-        if (existing.has(key)) { result.skipped++; continue; }
-        writes.push(d.prepare("INSERT INTO reviews (problem_id, reviewed_at, grade) VALUES (?, ?, ?)").bind(id, rec.reviewed_at, grade));
-        existing.add(key); result.reviews++;
-      }
-    } catch (e) {
-      result.errors.push(`Row ${i + 2}: ${(e as Error).message}`);
-    }
-  }
-  for (let i = 0; i < writes.length; i += BATCH) await d.batch(writes.slice(i, i + BATCH));
-  return result;
+  return meta;
 }
 
-export const RESET_PHRASE = "delete all my data";
-
-/** Wipe everything the user created: reviews, custom problems, My list and settings. */
-export async function resetAll(confirm: unknown) {
-  if (String(confirm ?? "").trim().toLowerCase() !== RESET_PHRASE) throw new Error(`Type "${RESET_PHRASE}" to confirm`);
+/** Import CSV rows into `listId` (rows can name their own list). Reviews are just appended; FSRS replays on read. */
+export async function importCsv(text: string, listId: string = DEFAULT_LIST_ID) {
+  const state = await loadAll();
+  const plan = planImport(text, state, listId, await resolveMeta(text, state));
   const d = await db();
-  await d.batch(["reviews", "custom_problems", "my_list", "settings"].map((t) => d.prepare(`DELETE FROM ${t}`)));
+  const now = new Date().toISOString();
+  const statement = (op: ImportOp) =>
+    op.kind === "list" ? d.prepare("INSERT INTO lists (id, name, created_at) VALUES (?, ?, ?)").bind(op.id, op.name, now)
+    : op.kind === "problem" ? insertCustom(d, op.problem, now)
+    : op.kind === "item" ? itemStatement(d, op.listId, op.problemId, op.section, now)
+    : d.prepare("INSERT INTO reviews (problem_id, reviewed_at, grade) VALUES (?, ?, ?)").bind(op.problemId, op.date, op.grade);
+  const writes = [...ensureDefaultList(d, DEFAULT_LIST_ID), ...plan.ops.map(statement)];
+  for (let i = 0; i < writes.length; i += BATCH) await d.batch(writes.slice(i, i + BATCH));
+  return plan.result;
+}
+
+// ——— Reset ———
+
+/** "progress": delete every solve and review, keep lists, problems and settings. "all": delete everything. */
+export async function reset(scope: unknown, confirm: unknown) {
+  const s = scope === "progress" ? "progress" : "all";
+  if (String(confirm ?? "").trim().toLowerCase() !== RESET_PHRASES[s]) throw new Error(`Type "${RESET_PHRASES[s]}" to confirm`);
+  const d = await db();
+  const tables = s === "progress" ? ["reviews"] : ["reviews", "custom_problems", "my_list", "list_items", "lists", "settings"];
+  await d.batch([...tables.map((t) => d.prepare(`DELETE FROM ${t}`)), ...(s === "all" ? ensureDefaultList(d, DEFAULT_LIST_ID) : [])]);
 }
