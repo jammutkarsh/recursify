@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useApp } from "@/context/AppData";
 import { BUILTIN_LISTS, builtinProblem, type Problem } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch";
 import { useTheme, type Theme } from "@/lib/theme";
 import { InfoTip, Kbd, Meta, describeDue } from "./ui";
 
@@ -177,7 +178,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
       <div className="flex items-center gap-3">
         <div className="flex-1"><p className="text-[13px] font-medium">Daily review reminder</p><p className="text-xs text-muted-foreground">Browser notification when reviews are due (while Recursify is open)</p></div>
         <input type="time" value={s.reminder.time} onChange={(e) => saveSettings({ reminder: { ...s.reminder, time: e.target.value } })} className="rounded-md border border-border bg-card px-3 py-2 text-sm" />
-        <input type="checkbox" role="switch" aria-label="Reminder on" checked={s.reminder.enabled} onChange={async (e) => { const enabled = e.target.checked; if (enabled && typeof Notification !== "undefined" && Notification.permission === "default") await Notification.requestPermission(); saveSettings({ reminder: { ...s.reminder, enabled } }); }} className="size-5 accent-primary" />
+        <Switch aria-label="Reminder on" checked={s.reminder.enabled} onCheckedChange={async (enabled) => { if (enabled && typeof Notification !== "undefined" && Notification.permission === "default") await Notification.requestPermission(); saveSettings({ reminder: { ...s.reminder, enabled } }); }} />
       </div>
       <div className="h-px bg-border" />
       <div className="flex flex-wrap items-center gap-2">

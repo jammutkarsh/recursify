@@ -1,6 +1,7 @@
 "use client";
 
 import { Info } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ReactNode } from "react";
 import type { Grade } from "@/lib/fsrs";
 import { cn } from "@/lib/utils";
@@ -94,3 +95,22 @@ export function Meta({ topic, difficulty, extra }: { topic?: string; difficulty:
 export const describeDue = (daysLate: number) => (daysLate > 0 ? `${daysLate}d late` : daysLate === 0 ? "today" : `in ${-daysLate}d`);
 
 export const ago = (days: number) => (days <= 0 ? "today" : days === 1 ? "yesterday" : `${days}d ago`);
+
+/** Styled dropdown on the shared base-ui Select. `prefix` is shown before the chosen label (e.g. "Topic:"). */
+export function Picker<T extends string>({ value, onChange, options, label, prefix, active, triggerRef, className }: {
+  value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; label: string; prefix?: string; active?: boolean;
+  triggerRef?: React.Ref<HTMLButtonElement>; className?: string;
+}) {
+  const labelOf = (v: unknown) => options.find((o) => o.value === v)?.label ?? String(v ?? "");
+  return (
+    <Select value={value} onValueChange={(v) => onChange(v as T)}>
+      <SelectTrigger ref={triggerRef} aria-label={label}
+        className={cn("h-9 gap-2 bg-card px-3 text-[13px] hover:bg-muted data-[popup-open]:border-primary", active && "border-2 border-primary font-semibold", className)}>
+        <SelectValue>{(v: unknown) => <>{prefix ? <span className="text-muted-foreground">{prefix}</span> : null}{labelOf(v)}</>}</SelectValue>
+      </SelectTrigger>
+      <SelectContent className="max-h-80 p-1" align="start" sideOffset={6} alignItemWithTrigger={false}>
+        {options.map((o) => <SelectItem key={o.value} value={o.value} className="text-[13px]">{o.label}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  );
+}

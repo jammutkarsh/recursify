@@ -6,7 +6,7 @@ import { isTyping } from "@/components/app/AppShell";
 import { ImportDialog } from "@/components/app/ImportDialog";
 import { useKey } from "@/components/app/overlays";
 import { ProblemDrawer } from "@/components/app/ProblemDrawer";
-import { ago, describeDue, diffText, GRADES, Kbd } from "@/components/app/ui";
+import { ago, describeDue, diffText, GRADES, Kbd, Picker } from "@/components/app/ui";
 import { useApp } from "@/context/AppData";
 import { sectionsOf, type Problem } from "@/lib/catalog";
 import type { Tracked } from "@/lib/derive";
@@ -28,7 +28,7 @@ function Library() {
   const params = useSearchParams();
   const router = useRouter();
   const path = usePathname();
-  const topicRef = useRef<HTMLSelectElement>(null);
+  const topicRef = useRef<HTMLButtonElement>(null);
   const [focus, setFocus] = useState(0);
   const q = (params.get("q") ?? "").trim();
   const topic = params.get("topic") ?? "";
@@ -81,23 +81,17 @@ function Library() {
 
   if (!model || !data) return <p className="p-8 text-sm text-muted-foreground">{app.error ? `Couldn't load your data — ${app.error}` : "Loading…"}</p>;
   const list = model.list(listId);
-  const select = "rounded-md border border-border bg-card px-3 py-2 text-[13px]";
   let i = -1;
 
   return (
     <div className="mx-auto flex h-full max-w-[1440px] flex-col gap-4 px-4 pt-6 md:px-8">
       <h1 className="sr-only">Library</h1>
       <div className="flex flex-wrap items-center gap-2">
-        <select aria-label="List" value={listId} onChange={(e) => setParam("list", e.target.value)} className={select}>
-          {model.lists.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-        </select>
-        <select ref={topicRef} aria-label="Topic" value={topic} onChange={(e) => setParam("topic", e.target.value || null)} className={cn(select, topic && "border-2 border-primary font-semibold")}>
-          <option value="">Topic: all</option>
-          {sectionsOf(list).map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <select aria-label="Sort" value={sort} onChange={(e) => setParam("sort", e.target.value)} className={select}>
-          <option value="weakest">Sort: weakest recall</option><option value="due">Sort: next due</option><option value="title">Sort: title</option>
-        </select>
+        <Picker label="List" value={listId} onChange={(v) => setParam("list", v)} options={model.lists.map((l) => ({ value: l.id, label: l.name }))} />
+        <Picker label="Topic" triggerRef={topicRef} prefix="Topic:" active={!!topic} value={topic || "all"} onChange={(v) => setParam("topic", v === "all" ? null : v)}
+          options={[{ value: "all", label: "all" }, ...sectionsOf(list).map((s) => ({ value: s, label: s }))]} />
+        <Picker label="Sort" prefix="Sort:" value={sort} onChange={(v) => setParam("sort", v)}
+          options={[{ value: "weakest", label: "weakest recall" }, { value: "due", label: "next due" }, { value: "title", label: "title" }]} />
         {q ? <button type="button" onClick={() => setParam("q", null)} className="rounded-md bg-primary-tint px-3 py-2 text-[13px] text-primary">Search: “{q}” ×</button> : null}
         <button type="button" onClick={() => setParam("import", "1")} className="ml-auto flex items-center gap-2 rounded-md border border-border px-3 py-2 text-[13px] font-semibold">Import CSV <Kbd>U</Kbd></button>
       </div>

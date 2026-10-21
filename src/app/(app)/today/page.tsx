@@ -6,7 +6,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { isTyping } from "@/components/app/AppShell";
 import { useKey } from "@/components/app/overlays";
 import { HeatLegend, TopicPolygon } from "@/components/app/TopicPolygon";
-import { Banner, describeDue, GRADES, GradeButtons, InfoTip, Kbd, Meta } from "@/components/app/ui";
+import { Banner, describeDue, GRADES, GradeButtons, InfoTip, Kbd, Meta, Picker } from "@/components/app/ui";
 import { useApp, type Toast } from "@/context/AppData";
 import { BUILTIN_LISTS, builtinProblem, slugFromUrl, type Problem } from "@/lib/catalog";
 import { gradeIntervals, type Tracked } from "@/lib/derive";
@@ -31,10 +31,8 @@ export default function TodayPage() {
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-semibold">Topic hold</h1>
           <InfoTip text={POLY_TIP} />
-          <select aria-label="Polygon list" value={data.settings.polygonList} onChange={(e) => app.saveSettings({ polygonList: e.target.value })}
-            className="ml-auto rounded-md border border-border bg-card px-2.5 py-1 text-[13px] text-foreground-2">
-            {model.lists.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-          </select>
+          <Picker label="Polygon list" className="ml-auto" value={data.settings.polygonList} onChange={(v) => app.saveSettings({ polygonList: v })}
+            options={model.lists.map((l) => ({ value: l.id, label: l.name }))} />
         </div>
         <TopicPolygon sections={model.polygon} today={today} />
         <HeatLegend />
