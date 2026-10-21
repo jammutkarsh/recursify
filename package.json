@@ -12,7 +12,7 @@
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "vinext-cloudflare deploy",
+    "deploy": "cf deploy",
     "types": "cf workers types",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

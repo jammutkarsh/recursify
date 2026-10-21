@@ -19,7 +19,7 @@ You need a GitHub account and a free Cloudflare account.
 3. Use these settings:
    - Project name: `leetcode-tracker` (must match `name` in `cloudflare.config.ts`)
    - Build command: _leave empty_
-   - Deploy command: `bun run deploy`
+   - Deploy command: `bun run deploy` (runs `cf deploy`; not `npx wrangler deploy`, which rejects this build output)
 4. Click **Deploy**. The KV namespace for your data is created automatically on the first deploy.
 5. Open the Worker's **Settings → Variables and Secrets**, add a **Secret** named `SITE_TOKEN`, and set it to a long random string (for example the output of `openssl rand -hex 32`). This is your password.
 6. Visit your `*.workers.dev` URL, click **Sign in**, and enter `SITE_TOKEN`.
