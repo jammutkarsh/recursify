@@ -28,7 +28,7 @@ export function buildModel(data: AppData, today: string) {
   const custom = new Map(data.customProblems.map((p) => [p.id, p]));
   const problem = (id: string): Problem | undefined => custom.get(id) ?? builtinProblem(id);
   const myList = customList(data.myList.map(problem).filter(Boolean) as Problem[]);
-  const lists: ListDef[] = [...BUILTIN_LISTS, myList];
+  const lists: ListDef[] = myList.sections.length ? [...BUILTIN_LISTS, myList] : BUILTIN_LISTS; // hide My list until it has a problem
   const followed = combineLists(data.settings.followedLists.map((id) => lists.find((l) => l.id === id)).filter(Boolean) as ListDef[]);
   const list = (id: string) => (id === FOLLOWED_LIST_ID ? followed : lists.find((l) => l.id === id) ?? followed);
   const { targetRecall } = data.settings;

@@ -76,7 +76,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Link href="/today" className="flex items-center gap-2 text-base font-bold"><LogoMark />Recursify</Link>
         <nav className="hidden items-center gap-5 text-sm md:flex">
           {nav.map(([href, label]) => (
-            <Link key={href} href={href} aria-current={path === href ? "page" : undefined} className={cn(path === href ? "font-semibold text-primary" : "text-muted-foreground hover:text-foreground")}>{label}</Link>
+            <Link key={href} href={href} prefetch aria-current={path === href ? "page" : undefined} className={cn(path === href ? "font-semibold text-primary" : "text-muted-foreground hover:text-foreground")}>{label}</Link>
           ))}
         </nav>
         <div ref={listRef} className="relative hidden md:block">
