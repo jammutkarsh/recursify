@@ -6,7 +6,7 @@ import { isTyping } from "@/components/app/AppShell";
 import { ImportDialog } from "@/components/app/ImportDialog";
 import { useKey } from "@/components/app/overlays";
 import { ProblemDrawer } from "@/components/app/ProblemDrawer";
-import { describeDue, diffText, GRADES, Kbd } from "@/components/app/ui";
+import { ago, describeDue, diffText, GRADES, Kbd } from "@/components/app/ui";
 import { useApp } from "@/context/AppData";
 import { sectionsOf, type Problem } from "@/lib/catalog";
 import type { Tracked } from "@/lib/derive";
@@ -115,7 +115,7 @@ function Library() {
               <h2 className="flex items-center gap-2.5 px-3 pt-4 pb-2">
                 <span className="size-3.5 rounded-[3px]" style={{ background: HEAT[level(g.solved, g.total)] }} />
                 <span className="text-[15px] font-semibold">{g.name}</span>
-                <span className="font-mono text-xs text-muted-foreground">{g.solved}/{g.total} solved{g.reviewed ? ` · last reviewed ${daysBetween(g.reviewed, today)}d ago` : ""}</span>
+                <span className="font-mono text-xs text-muted-foreground">{g.solved}/{g.total} solved{g.reviewed ? ` · last reviewed ${ago(daysBetween(g.reviewed, today))}` : ""}</span>
               </h2>
               <ul className="overflow-hidden rounded-lg border border-border bg-card">
                 {g.rows.map(({ p, t }) => {
@@ -135,7 +135,7 @@ function Library() {
                             : <span className="font-mono text-xs text-muted-foreground">not solved</span>}
                         </span>
                         <span className={cn("hidden w-24 text-right text-xs font-semibold md:block", t?.lastGrade ? GRADES[t.lastGrade - 1].cls.split(" ").find((c) => c.startsWith("text-")) : "text-muted-foreground")}>{t?.lastGrade ? GRADES[t.lastGrade - 1].label : t ? "First solve" : "—"}</span>
-                        <span className="hidden w-24 text-right font-mono text-xs text-muted-foreground md:block">{t ? `${daysBetween(t.card.lastReview, today)}d ago` : "—"}</span>
+                        <span className="hidden w-24 text-right font-mono text-xs text-muted-foreground md:block">{t ? ago(daysBetween(t.card.lastReview, today)) : "—"}</span>
                         <span className={cn("w-20 text-right font-mono text-xs", t && t.daysLate > 0 ? "font-semibold text-forgot-text" : "text-muted-foreground")}>{t ? describeDue(t.daysLate) : "new"}</span>
                       </button>
                     </li>

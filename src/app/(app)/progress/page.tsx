@@ -20,7 +20,7 @@ export default function ProgressPage() {
   const short = recall !== null && recall < target && p.recallsNeeded > 0;
 
   const tiles: [string, string, string, string?][] = [
-    ["PROBLEMS SOLVED", String(p.solvedUnique), `unique across ${data.settings.followedLists.length} list${data.settings.followedLists.length === 1 ? "" : "s"} · +${p.solvedThisWeek} this week`],
+    ["PROBLEMS SOLVED", String(p.solvedUnique), `unique across all lists${p.solvedThisWeek ? ` · +${p.solvedThisWeek} this week` : ""}`],
     ["REVIEWS DONE", String(p.reviews12w), "last 12 weeks"],
     ["ACTUAL RECALL", recall === null ? "—" : `${recall}%`, recall === null ? "no reviews in the last 4 weeks" : short ? `recall ${p.recallsNeeded} more to reach ${target}%` : `on target (${target}%)`, short ? "text-forgot-text" : undefined],
     ["ACTIVE DAYS", String(p.activeDays), "of the last 84"],
@@ -40,13 +40,13 @@ export default function ProgressPage() {
           ))}
         </div>
 
-        <section className={card} aria-label="Lists you follow">
-          <div className="mb-3.5 flex flex-wrap items-baseline gap-2"><h2 className="flex-1 font-semibold">Lists you follow</h2><span className="text-xs text-muted-foreground">a problem in several lists counts once in the totals above</span></div>
+        <section className={card} aria-label="Lists">
+          <div className="mb-3.5 flex flex-wrap items-baseline gap-2"><h2 className="flex-1 font-semibold">Lists</h2><span className="text-xs text-muted-foreground">a problem in several lists counts once in the totals above</span></div>
           <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
             {p.perList.map((l) => (
               <div key={l.id}>
-                <div className="flex text-sm"><span className="flex-1 font-medium">{l.name}</span><span className="font-mono text-[13px] text-foreground-2">{l.solved} / {l.total}</span></div>
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-track"><div className="h-full rounded-full bg-heat-3" style={{ width: `${l.total ? Math.max(2, (l.solved / l.total) * 100) : 0}%` }} /></div>
+                <div className="flex items-center gap-2 text-sm"><span className={cn("font-medium", !l.followed && "text-muted-foreground")}>{l.name}</span>{l.followed ? <span className="rounded-[4px] bg-primary-tint px-1.5 py-0.5 text-[10px] font-semibold text-primary">FOLLOWING</span> : null}<span className="flex-1" /><span className="font-mono text-[13px] text-foreground-2">{l.solved} / {l.total}</span></div>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-track"><div className="h-full rounded-full bg-heat-3 transition-[width] duration-700 ease-out" style={{ width: `${l.total && l.solved ? Math.max(2, (l.solved / l.total) * 100) : 0}%` }} /></div>
               </div>
             ))}
           </div>

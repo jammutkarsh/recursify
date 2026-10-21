@@ -21,7 +21,6 @@ export default function TodayPage() {
   const app = useApp();
   const { model, data, today } = app;
   if (!model || !data) return <Loading error={app.error} />;
-  const firstRun = data.reviews.length === 0;
   return (
     <div className="mx-auto flex h-full max-w-[1440px] flex-col gap-6 overflow-y-auto px-4 pt-4 pb-4 md:px-8 md:pt-8 lg:flex-row lg:gap-12 lg:overflow-visible">
       <section aria-label="Topic hold" className="rounded-xl border border-border bg-card p-3 lg:hidden">
@@ -41,9 +40,9 @@ export default function TodayPage() {
         <HeatLegend />
       </section>
       <section className="flex min-w-0 flex-1 flex-col lg:min-h-0">
-        {firstRun ? null : <TopBanner />}
-        <Suspense><TodaySection firstRun={firstRun} /></Suspense>
-        {firstRun ? null : <ReviewQueue />}
+        <TopBanner />
+        <Suspense><TodaySection /></Suspense>
+        <ReviewQueue />
       </section>
       <ToastBar />
     </div>
@@ -92,7 +91,7 @@ function TopBanner() {
 
 type Pick = { kind: "problem"; p: Problem } | { kind: "link"; slug: string } | { kind: "new"; title: string };
 
-function TodaySection({ firstRun }: { firstRun: boolean }) {
+function TodaySection() {
   const app = useApp();
   const { model, data, today } = app;
   const params = useSearchParams();
@@ -148,20 +147,23 @@ function TodaySection({ firstRun }: { firstRun: boolean }) {
     else if (e.key === "Escape") { setQ(""); inputRef.current?.blur(); }
   };
 
-  if (firstRun && !open) {
-    return (
-      <div>
-        <div className="mb-3 flex items-baseline gap-3"><h2 className="text-lg font-semibold">Today</h2><span className="font-mono text-xs text-muted-foreground">log anything you solve</span></div>
-        <button type="button" onClick={() => { setOpen(true); requestAnimationFrame(() => inputRef.current?.focus()); }}
-          className="inline-flex items-center gap-2.5 rounded-lg bg-primary px-4.5 py-3 text-[15px] font-semibold text-primary-foreground">+ Log your first solve <Kbd onPrimary>A</Kbd></button>
-      </div>
-    );
-  }
-
   const loggedToday = model.todayReviews;
   const items = [...pendingGrade.filter((id) => !loggedToday.some((r) => r.problemId === id)).map((id) => ({ pending: true as const, id })),
     ...loggedToday.map((r) => ({ pending: false as const, id: r.problemId, review: r }))];
   const meta = model.catchUp ? "new problems paused during catch-up" : `${loggedToday.length} logged · ${model.firstSolvesToday} of ${data.settings.newPerDay} new`;
+
+  // Nothing to log, suggest or review: a single "Add new" button; A or a click opens the add box.
+  if (!open && !items.length && !model.nextUp.length && !model.queue.length) {
+    return (
+      <div className="mb-7">
+        <div className="mb-3 flex items-baseline gap-3"><h2 className="text-lg font-semibold">Today</h2><span className="font-mono text-xs text-muted-foreground">log anything you solve</span></div>
+        <button type="button" onClick={() => { setOpen(true); requestAnimationFrame(() => inputRef.current?.focus()); }}
+          className="inline-flex items-center gap-2.5 rounded-lg bg-primary px-4.5 py-3 text-[15px] font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 active:scale-[0.98]">
+          <Plus className="size-4" />Add new <Kbd onPrimary>A</Kbd>
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="shrink-0">
@@ -338,7 +340,7 @@ function QueueRow({ t, i, focused, onFocus }: { t: Tracked; i: number; focused: 
   const app = useApp();
   const { data, today } = app;
   return (
-    <li data-i={i} className={cn("border-b border-border last:border-0", focused && "border-l-[3px] border-l-primary bg-primary-tint")} onMouseEnter={onFocus}>
+    <li data-i={i} className={cn("border-b border-border transition-colors duration-150 last:border-0", focused && "border-l-[3px] border-l-primary bg-primary-tint")} onMouseEnter={onFocus}>
       <div className="flex items-center gap-4 px-4 py-3">
         <a href={t.problem.url ?? undefined} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium hover:underline">{t.problem.title}</span>
@@ -346,7 +348,7 @@ function QueueRow({ t, i, focused, onFocus }: { t: Tracked; i: number; focused: 
         </a>
         <span className={cn("font-mono text-xs", t.daysLate > 0 ? "text-forgot-text" : "text-medium")}>{describeDue(t.daysLate)}</span>
       </div>
-      {focused && data ? <div className="px-4 pb-3.5"><GradeButtons intervals={gradeIntervals(t, today, data.settings.targetRecall)} onGrade={(g) => app.grade(t.problem.id, g)} /></div> : null}
+      {focused && data ? <div className="px-4 pb-3.5 animate-in fade-in-0 slide-in-from-top-1 duration-200"><GradeButtons intervals={gradeIntervals(t, today, data.settings.targetRecall)} onGrade={(g) => app.grade(t.problem.id, g)} /></div> : null}
     </li>
   );
 }
@@ -356,7 +358,7 @@ function ToastBar() {
   useEffect(() => { if (!toast) return; const id = setTimeout(() => setToast(null), toast.kind === "error" ? 8000 : 6000); return () => clearTimeout(id); }, [toast, setToast]);
   if (!toast) return null;
   return (
-    <div role="status" aria-live="polite" className="fixed bottom-20 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3.5 rounded-xl bg-toast py-3 pr-3 pl-4 text-toast-foreground shadow-2xl md:bottom-16">
+    <div role="status" aria-live="polite" className="fixed bottom-20 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3.5 rounded-xl bg-toast py-3 pr-3 pl-4 text-toast-foreground shadow-2xl animate-in fade-in-0 slide-in-from-bottom-4 duration-300 ease-out md:bottom-16">
       <ToastBody toast={toast} model={model} targetRecall={data?.settings.targetRecall ?? 0.9} />
       {toast.kind === "graded" ? <button type="button" onClick={undo} className="flex items-center gap-1.5 rounded-md bg-white/10 px-2.5 py-1.5 text-[13px] font-semibold">Undo <Kbd onPrimary>Z</Kbd></button> : null}
     </div>

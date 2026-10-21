@@ -4,11 +4,12 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { Model } from "@/lib/derive";
 import { daysBetween } from "@/lib/fsrs";
+import { ago } from "./ui";
 
 const HEAT = ["var(--heat-0)", "var(--heat-1)", "var(--heat-2)", "var(--heat-3)", "var(--heat-4)"];
 const level = (solved: number, total: number) => (solved === 0 ? 0 : Math.min(4, Math.ceil((solved / total) * 4)));
 const fmt = (d: string | null, today: string) =>
-  d ? `${new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })} · ${daysBetween(d, today)}d ago` : "—";
+  d ? `${new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })} · ${ago(daysBetween(d, today))}` : "—";
 
 /** N-gon, one wedge per section of the selected list. Colour = share solved. Hover = stats, click = Library filtered. */
 export function TopicPolygon({ sections, today, linkToLibrary = true, compact = false }: { sections: Pick<Model["polygon"][number], "name" | "solved" | "total" | "lastSolved" | "lastReviewed" | "due">[]; today: string; linkToLibrary?: boolean; compact?: boolean }) {
@@ -31,7 +32,7 @@ export function TopicPolygon({ sections, today, linkToLibrary = true, compact = 
             <g key={s.name} className={linkToLibrary ? "cursor-pointer" : undefined} onMouseEnter={() => setHover(k)} onMouseLeave={() => setHover(null)}
               onClick={linkToLibrary ? () => router.push(`/library?topic=${encodeURIComponent(s.name)}`) : undefined}>
               <path d={`M${CX} ${CY} L${x1} ${y1} L${x2} ${y2} Z`} fill={HEAT[level(s.solved, s.total)]} stroke="var(--background)" strokeWidth={2}
-                className="transition-opacity hover:opacity-85" />
+                className="transition-[opacity,fill] duration-200 hover:opacity-85" />
               {compact ? null : <text x={lx} y={ly + (Math.abs(cos) <= 0.15 ? (sin < 0 ? -6 : 14) : 4)} textAnchor={anchor} className="fill-foreground text-[12px] font-medium">
                 {anchor === "end" ? <><tspan className="fill-muted-foreground font-mono text-[11px]">{s.solved}/{s.total}</tspan> {s.name}</> : <>{s.name} <tspan className="fill-muted-foreground font-mono text-[11px]">{s.solved}/{s.total}</tspan></>}
               </text>}
@@ -41,7 +42,7 @@ export function TopicPolygon({ sections, today, linkToLibrary = true, compact = 
         {hover !== null ? (() => { const [x1, y1] = v(hover), [x2, y2] = v(hover + 1); return <path d={`M${CX} ${CY} L${x1} ${y1} L${x2} ${y2} Z`} fill="none" stroke="var(--primary)" strokeWidth={3} strokeLinejoin="round" pointerEvents="none" />; })() : null}
       </svg>
       {h ? (
-        <div className="pointer-events-none absolute top-1/2 left-1/2 z-10 ml-6 w-60 max-sm:left-auto max-sm:right-0 max-sm:ml-0 rounded-lg border border-border bg-card px-3.5 py-3 shadow-lg">
+        <div key={hover} className="pointer-events-none absolute top-1/2 left-1/2 z-10 ml-6 w-60 animate-in fade-in-0 zoom-in-95 duration-150 max-sm:left-auto max-sm:right-0 max-sm:ml-0 rounded-lg border border-border bg-card px-3.5 py-3 shadow-lg">
           <div className="mb-1.5 flex items-center gap-2">
             <span className="size-3 rounded-[3px]" style={{ background: HEAT[level(h.solved, h.total)] }} />
             <span className="text-sm font-semibold">{h.name}</span>

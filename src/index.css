@@ -103,37 +103,39 @@
 }
 
 .dark {
-  --background: #0d1117;
-  --card: #161b22;
-  --popover: #161b22;
-  --muted: #21262d;
-  --track: #30363d;
-  --border: #30363d;
-  --input: #30363d;
-  --chart-grid: #21262d;
-  --scrim: rgb(1 4 9 / 0.6);
-  --foreground: #e6edf3;
-  --foreground-2: #c9d1d9;
-  --muted-foreground: #8b949e;
-  --icon-inactive: #6e7681;
-  --primary: #8b8dff;
-  --primary-foreground: #0d1117;
-  --primary-tint: #1d1f42;
-  --ring: #8b8dff;
-  --toast: #30363d;
-  --toast-foreground: #e6edf3;
-  --toast-muted: #8b949e;
-  --grade-forgot: #ff6369;    --grade-forgot-tint: #3b1219;    --grade-forgot-text: #ff8589;
-  --grade-struggled: #ff8b3e; --grade-struggled-tint: #331e0b; --grade-struggled-text: #ffa057;
-  --grade-recalled: #3fb950;  --grade-recalled-tint: #12261a;  --grade-recalled-text: #56d364;
-  --grade-instant: #58a6ff;   --grade-instant-tint: #0d2847;   --grade-instant-text: #79c0ff;
-  --difficulty-easy: #2bc3aa;
-  --difficulty-medium: #e2b33c;
-  --difficulty-hard: #ff6369;
-  --warning: #e2b33c;
-  --warning-tint: #2e2410;
+  /* Neutral charcoal with three elevation steps; tints are mixed into the card colour
+     so they read as soft washes instead of saturated blocks. */
+  --background: #0e0f12;
+  --card: #16181c;
+  --popover: #1b1d22;
+  --muted: #202329;
+  --track: #2a2e35;
+  --border: #262a31;
+  --input: #30353d;
+  --chart-grid: #1f2228;
+  --scrim: rgb(0 0 0 / 0.55);
+  --foreground: #ececef;
+  --foreground-2: #c3c6cc;
+  --muted-foreground: #8c9099;
+  --icon-inactive: #6b7079;
+  --primary: #8f91ff;
+  --primary-foreground: #0e0f12;
+  --primary-tint: color-mix(in oklab, #8f91ff 13%, #16181c);
+  --ring: #8f91ff;
+  --toast: #262930;
+  --toast-foreground: #ececef;
+  --toast-muted: #9aa0a8;
+  --grade-forgot: #ff6b70;    --grade-forgot-tint: color-mix(in oklab, #ff6b70 14%, #16181c);    --grade-forgot-text: #ff8f93;
+  --grade-struggled: #ff9147; --grade-struggled-tint: color-mix(in oklab, #ff9147 14%, #16181c); --grade-struggled-text: #ffab70;
+  --grade-recalled: #45c35a;  --grade-recalled-tint: color-mix(in oklab, #45c35a 14%, #16181c);  --grade-recalled-text: #6bd97c;
+  --grade-instant: #5aa9ff;   --grade-instant-tint: color-mix(in oklab, #5aa9ff 14%, #16181c);   --grade-instant-text: #85c0ff;
+  --difficulty-easy: #34c9ae;
+  --difficulty-medium: #e6b94a;
+  --difficulty-hard: #ff6b70;
+  --warning: #e6b94a;
+  --warning-tint: color-mix(in oklab, #e6b94a 12%, #16181c);
   /* GitHub dark convention: brighter = more solved. heat-0 stays visible on --card. */
-  --heat-0: #21262d;
+  --heat-0: #23262c;
   --heat-1: #0e4429;
   --heat-2: #006d32;
   --heat-3: #26a641;
@@ -179,4 +181,10 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Smooth colour cross-fade while switching theme (class is added for ~300ms). */
+.theme-switching,
+.theme-switching * {
+  transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease, fill 0.25s ease !important;
 }

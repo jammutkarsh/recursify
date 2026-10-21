@@ -27,8 +27,8 @@ export function ProblemDrawer({ id, onClose }: { id: string; onClose: () => void
 
   return (
     <div className="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label={p.title}>
-      <div className="absolute inset-0 bg-[var(--scrim)]" onClick={onClose} />
-      <aside className="absolute top-0 right-0 flex h-full w-full max-w-[520px] flex-col gap-5 overflow-y-auto bg-card px-7 py-6 shadow-2xl">
+      <div className="absolute inset-0 bg-[var(--scrim)] animate-in fade-in-0 duration-200" onClick={onClose} />
+      <aside className="absolute top-0 right-0 flex h-full w-full max-w-[520px] flex-col gap-5 overflow-y-auto bg-card px-7 py-6 shadow-2xl animate-in slide-in-from-right duration-300 ease-out">
         <div className="flex items-center gap-2">
           <span className={cn("rounded-[6px] bg-muted px-2 py-0.5 text-xs font-semibold", diffText[p.difficulty])}>{p.difficulty}</span>
           {section ? <span className="rounded-[6px] bg-muted px-2 py-0.5 text-xs font-semibold text-foreground-2">{section}</span> : null}

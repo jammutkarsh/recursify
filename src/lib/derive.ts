@@ -96,9 +96,8 @@ export const gradeIntervals = (t: Tracked, today: string, targetRecall: number) 
 
 export function progress(m: Model, data: AppData, today: string) {
   const t0 = toDay(today);
-  const followed = data.settings.followedLists.map((id) => m.list(id));
-  const followedIds = new Set(followed.flatMap((l) => l.sections.map((s) => s.id)));
-  const solvedUnique = [...m.tracked.keys()].filter((id) => followedIds.has(id)).length;
+  const followed = new Set(data.settings.followedLists);
+  const solvedUnique = m.tracked.size; // every solved problem once, whichever lists it's in
   const since = (days: number) => fromDay(t0 - days);
   const graded = (from: string) => data.reviews.filter((r) => r.grade !== null && r.date >= from && r.date <= today);
   const last12 = graded(since(84));
@@ -125,7 +124,7 @@ export function progress(m: Model, data: AppData, today: string) {
     actualRecall: last4.length ? successes / last4.length : null,
     recallsNeeded: recallsToTarget(last4.length, successes, data.settings.targetRecall),
     activeDays,
-    perList: followed.map((l) => ({ id: l.id, name: l.name, solved: l.sections.filter((s) => m.tracked.has(s.id)).length, total: l.sections.length })),
+    perList: m.lists.map((l) => ({ id: l.id, name: l.name, followed: followed.has(l.id), solved: l.sections.filter((s) => m.tracked.has(s.id)).length, total: l.sections.length })),
     activity,
     upcoming,
     weekly,

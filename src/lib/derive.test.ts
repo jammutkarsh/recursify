@@ -43,7 +43,7 @@ test("custom problems live in My list; progress counts unique solves in followed
   expect(m.list("custom").sections).toEqual([{ id: "custom-x", section: "System Design" }]);
   const p = progress(m, d, "2026-10-20");
   expect(p.solvedUnique).toBe(2); // two-sum is in NeetCode and Blind 75 but counts once
-  expect(p.perList.map((l) => l.solved)).toEqual([1, 1, 1]);
+  expect(p.perList.map((l) => [l.id, l.solved, l.followed])).toEqual([["neetcode150", 1, true], ["blind75", 1, true], ["leetcode75", 1, false], ["custom", 1, true]]);
 });
 
 test("history details report the gap and predicted recall at each review", () => {

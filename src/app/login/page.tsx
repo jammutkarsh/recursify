@@ -34,8 +34,6 @@ export default function LoginPage() {
 
   return (
     <main id="main-content" className="flex min-h-dvh items-center justify-center bg-background p-4">
-      <title>Sign in · Recursify</title>
-      <meta name="robots" content="noindex, nofollow" />
       <form onSubmit={submit} className="flex w-full max-w-[420px] flex-col items-center gap-5 rounded-xl border border-border bg-card px-9 py-9 shadow-xl">
         <LogoMark size={56} />
         <div className="text-center">

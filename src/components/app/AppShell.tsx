@@ -1,9 +1,10 @@
 "use client";
 
-import { CalendarCheck, ChartNoAxesColumn, LibraryBig, Plus, Search, Settings as Gear } from "lucide-react";
+import { CalendarCheck, ChartNoAxesColumn, Keyboard, LibraryBig, Moon, Plus, Search, Settings as Gear, Sun } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useTheme } from "@/lib/theme";
 import { useApp } from "@/context/AppData";
 import { cn } from "@/lib/utils";
 import { ListPicker, SearchPanel, SettingsDialog, ShortcutsDialog, useKey } from "./overlays";
@@ -27,7 +28,7 @@ export const isTyping = (e: KeyboardEvent) => {
 const FOOTERS: Record<string, [string[], string][]> = {
   "/today": [[["J", "K"], "move"], [["Enter"], "open on LeetCode"], [["1", "–", "4"], "grade focused"], [["Z"], "undo"], [["Esc"], "clear"]],
   "/library": [[["J", "K"], "move"], [["Enter"], "open"], [["T"], "pick topic"], [["G", "T"], "go to Today"]],
-  "/progress": [[["G", "T"], "go to Today"], [["G", "L"], "Library"], [["?"], "keys"]],
+  "/progress": [[["G", "T"], "go to Today"], [["G", "L"], "Library"]],
 };
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -57,6 +58,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   });
 
   useReminder();
+  const listRef = useRef<HTMLDivElement>(null);
+  const searchBox = useRef<HTMLDivElement>(null);
+  useOutside(listRef, () => setDialog((d) => (d === "lists" ? null : d)), dialog === "lists");
+  useOutside(searchBox, () => setQuery(""), !!query);
+  const { theme, setTheme } = useTheme();
+  const addNew = () => (path === "/today" ? window.dispatchEvent(new Event("recursify:log")) : router.push("/today?log=1"));
+  const btn = "flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-[13px] font-medium text-foreground-2 transition-colors hover:border-foreground/20 hover:bg-muted active:scale-[0.98]";
   const polyName = model?.list(data?.settings.followedLists[0] ?? "neetcode150").name ?? "Lists";
   const extra = (data?.settings.followedLists.length ?? 1) - 1;
   const nav = [["/today", "Today"], ["/library", "Library"], ["/progress", "Progress"]];
@@ -70,15 +78,15 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Link key={href} href={href} aria-current={path === href ? "page" : undefined} className={cn(path === href ? "font-semibold text-primary" : "text-muted-foreground hover:text-foreground")}>{label}</Link>
           ))}
         </nav>
-        <div className="relative hidden md:block">
+        <div ref={listRef} className="relative hidden md:block">
           <button type="button" onClick={() => setDialog((d) => (d === "lists" ? null : "lists"))} aria-expanded={dialog === "lists"}
-            className={cn("flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[13px]", dialog === "lists" ? "border-primary" : "border-border")}>
+            className={cn("flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[13px] transition-colors hover:bg-muted", dialog === "lists" ? "border-primary" : "border-border")}>
             <span className="font-medium">{polyName}</span>{extra > 0 ? <span className="font-mono text-[11px] text-muted-foreground">+{extra}</span> : null}<span className="text-[11px] text-muted-foreground">▾</span><Kbd>L</Kbd>
           </button>
           {dialog === "lists" ? <ListPicker onClose={() => setDialog(null)} /> : null}
         </div>
         <div className="flex flex-1 justify-center">
-          <div className="relative w-full max-w-[400px]">
+          <div ref={searchBox} className="relative w-full max-w-[400px]">
             <label className={cn("flex items-center gap-2 rounded-lg border bg-muted py-1.5 pr-2 pl-3", query ? "border-primary bg-card ring-1 ring-primary" : "border-border")}>
               <Search className="size-4 text-muted-foreground" />
               <input ref={searchRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search problems or topics" aria-label="Search problems or topics"
@@ -88,21 +96,40 @@ export function AppShell({ children }: { children: ReactNode }) {
             <SearchPanel query={query} onClose={() => { setQuery(""); searchRef.current?.blur(); }} />
           </div>
         </div>
-        <div className="hidden items-center gap-4 lg:flex">
-          <button type="button" onClick={() => (path === "/today" ? window.dispatchEvent(new Event("recursify:log")) : router.push("/today?log=1"))} className="flex items-center gap-1 text-xs text-muted-foreground"><Kbd>A</Kbd>add</button>
-          <button type="button" onClick={() => setDialog("keys")} className="flex items-center gap-1 text-xs text-muted-foreground"><Kbd>?</Kbd>keys</button>
+        <div className="hidden items-center gap-2 md:flex">
+          <button type="button" onClick={addNew} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 active:scale-[0.98]">
+            <Plus className="size-4" />Add <Kbd onPrimary className="hidden lg:inline-flex">A</Kbd>
+          </button>
+          <button type="button" onClick={() => setDialog("settings")} className={btn}><Gear className="size-4" />Settings <Kbd className="hidden lg:inline-flex">,</Kbd></button>
+          <button type="button" aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"} onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className={cn(btn, "px-2")}>
+            {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+          </button>
         </div>
-        <button type="button" onClick={() => setDialog("settings")} aria-label="Settings" className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-          <Gear className="size-4" /><Kbd className="hidden lg:inline-flex">,</Kbd><span className="hidden lg:inline">settings</span>
-        </button>
       </header>
       <main id="main-content" className="min-h-0 flex-1">{children}</main>
-      {FOOTERS[path] ? <footer className="hidden shrink-0 border-t border-border bg-card px-8 py-3 md:block"><KeyHints items={FOOTERS[path]} /></footer> : null}
+      {FOOTERS[path] ? (
+        <footer className="hidden shrink-0 items-center gap-4 border-t border-border bg-card px-8 py-2.5 md:flex">
+          <KeyHints items={FOOTERS[path]} />
+          <button type="button" onClick={() => setDialog("keys")} className={cn(btn, "ml-auto text-xs")}><Keyboard className="size-4" />Keyboard shortcuts <Kbd>?</Kbd></button>
+        </footer>
+      ) : null}
       <MobileTabs path={path} onSettings={() => setDialog("settings")} />
       {dialog === "keys" ? <ShortcutsDialog onClose={() => setDialog(null)} /> : null}
       {dialog === "settings" ? <SettingsDialog onClose={() => setDialog(null)} /> : null}
     </div>
   );
+}
+
+/** Call `onOutside` on a pointer press outside `ref` while `active`. */
+function useOutside(ref: RefObject<HTMLElement | null>, onOutside: () => void, active: boolean) {
+  const cb = useRef(onOutside);
+  useEffect(() => { cb.current = onOutside; });
+  useEffect(() => {
+    if (!active) return;
+    const h = (e: PointerEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) cb.current(); };
+    document.addEventListener("pointerdown", h);
+    return () => document.removeEventListener("pointerdown", h);
+  }, [active, ref]);
 }
 
 /** Daily review reminder: a browser notification at the chosen time while the app is open and reviews are due. */

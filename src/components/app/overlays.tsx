@@ -7,13 +7,17 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useApp } from "@/context/AppData";
 import { BUILTIN_LISTS, builtinProblem, type Problem } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
+import { useTheme, type Theme } from "@/lib/theme";
 import { InfoTip, Kbd, Meta, describeDue } from "./ui";
 
 export function Overlay({ onClose, children, className, label }: { onClose: () => void; children: ReactNode; className?: string; label: string }) {
+  useKey((e) => { if (e.key === "Escape") onClose(); });
   return (
     <div className="fixed inset-0 z-40" role="dialog" aria-modal="true" aria-label={label}>
-      <div className="absolute inset-0 bg-[var(--scrim)]" onClick={onClose} />
-      <div className={cn("absolute left-1/2 -translate-x-1/2 rounded-xl border border-border bg-card shadow-2xl", className)}>{children}</div>
+      <div className="absolute inset-0 bg-[var(--scrim)] animate-in fade-in-0 duration-200" onClick={onClose} />
+      <div className="absolute inset-x-0 flex justify-center px-4" style={{ top: 0 }}>
+        <div className={cn("relative rounded-xl border border-border bg-card shadow-2xl animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-200 ease-out", className)}>{children}</div>
+      </div>
     </div>
   );
 }
@@ -54,13 +58,13 @@ export function SearchPanel({ query, onClose }: { query: string; onClose: () => 
   const hl = (title: string) => { const i = title.toLowerCase().indexOf(q); return i < 0 ? title : <>{title.slice(0, i)}<b className="font-semibold text-primary">{title.slice(i, i + q.length)}</b>{title.slice(i + q.length)}</>; };
   const label = { topic: "TOPICS", problem: "PROBLEMS", add: "ACTIONS" } as const;
   return (
-    <div className="absolute top-full left-1/2 z-50 mt-2 w-[560px] max-w-[calc(100vw-32px)] -translate-x-1/2 overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+    <div className="absolute top-full left-1/2 z-50 mt-2 w-[560px] max-w-[calc(100vw-32px)] -translate-x-1/2 overflow-hidden rounded-xl border border-border bg-card shadow-2xl animate-in fade-in-0 slide-in-from-top-1 duration-150">
       {results.map((r, i) => {
         const t = r.kind === "problem" ? model?.tracked.get(r.p.id) : undefined;
         return (
           <div key={i}>
             {i === 0 || results[i - 1].kind !== r.kind ? <p className="px-3.5 pt-2.5 pb-1 font-mono text-[10px] text-muted-foreground">{label[r.kind]}</p> : null}
-            <button type="button" onMouseEnter={() => setSel(i)} onClick={() => open(i)} className={cn("flex w-full items-center gap-2.5 px-3.5 py-2 text-left", sel === i && "bg-primary-tint")}>
+            <button type="button" onMouseEnter={() => setSel(i)} onClick={() => open(i)} className={cn("flex w-full items-center gap-2.5 px-3.5 py-2 text-left transition-colors", sel === i && "bg-primary-tint")}>
               {r.kind === "topic" ? <><span className="size-3 rounded-[3px] bg-heat-3" /><span className="flex-1 text-sm font-medium">{hl(r.name)}</span><span className="text-xs text-muted-foreground">{r.total} problems · open in Library</span></> : null}
               {r.kind === "problem" ? <><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{hl(r.p.title)}</span><Meta topic={r.p.topics[0]} difficulty={r.p.difficulty} /></span>
                 <span className={cn("font-mono text-xs", t && t.daysLate > 0 ? "font-semibold text-forgot-text" : "text-muted-foreground")}>{t ? describeDue(t.daysLate) : "not solved"}</span></> : null}
@@ -93,13 +97,13 @@ export function ListPicker({ onClose }: { onClose: () => void }) {
     if (next.length) saveSettings({ followedLists: next });
   };
   return (
-    <div className="absolute top-full left-0 z-50 mt-2 w-[340px] overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+    <div className="absolute top-full left-0 z-50 mt-2 w-[340px] overflow-hidden rounded-xl border border-border bg-card shadow-2xl animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-150 origin-top-left">
       <p className="px-3.5 pt-2.5 pb-1 font-mono text-[10px] text-muted-foreground">LISTS YOU FOLLOW</p>
       {model.lists.map((l) => {
         const on = followed.has(l.id);
         const solved = l.sections.filter((s) => model.tracked.has(s.id)).length;
         return (
-          <button key={l.id} type="button" onClick={() => toggle(l.id)} className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left hover:bg-primary-tint">
+          <button key={l.id} type="button" onClick={() => toggle(l.id)} className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left transition-colors hover:bg-primary-tint">
             <span className={cn("flex size-4 items-center justify-center rounded-[4px]", on ? "bg-primary text-primary-foreground" : "border-[1.5px] border-icon-inactive")}>{on ? <Check className="size-3" strokeWidth={3} /> : null}</span>
             <span className={cn("flex-1 text-sm", on ? "font-medium" : "text-muted-foreground")}>{l.name}</span>
             {data.settings.polygonList === l.id ? <span className="rounded-[4px] bg-primary-tint px-1.5 py-0.5 text-[11px] font-medium text-primary">polygon</span> : null}
@@ -122,7 +126,7 @@ export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
     ["GENERAL", [[["L"], "List picker"], [["?"], "This help"], [["Esc"], "Close dialog"]]],
   ];
   return (
-    <Overlay onClose={onClose} label="Keyboard shortcuts" className="top-[15vh] w-[720px] max-w-[calc(100vw-32px)] p-7">
+    <Overlay onClose={onClose} label="Keyboard shortcuts" className="mt-[15vh] w-[720px] max-w-[calc(100vw-32px)] p-7">
       <div className="mb-5 flex items-center"><h2 className="flex-1 text-xl font-bold">Keyboard shortcuts</h2><Kbd>?</Kbd></div>
       <div className="grid gap-x-10 gap-y-5 sm:grid-cols-2">
         {groups.map(([g, rows]) => (
@@ -142,10 +146,21 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const { data, saveSettings } = useApp();
   if (!data) return null;
   const s = data.settings;
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const { theme, setTheme } = useTheme();
   const signOut = async () => { await fetch("/api/logout", { method: "POST" }); window.location.assign("/login"); };
   return (
-    <Overlay onClose={onClose} label="Settings" className="top-[12vh] w-[560px] max-w-[calc(100vw-32px)] space-y-5 p-7">
+    <Overlay onClose={onClose} label="Settings" className="mt-[12vh] w-[560px] max-w-[calc(100vw-32px)] space-y-5 p-7">
       <div className="flex items-center"><h2 className="flex-1 text-xl font-bold">Settings</h2><Kbd>Esc</Kbd></div>
+      <div className="flex items-center gap-4">
+        <div className="flex-1"><p className="text-[13px] font-medium">Appearance</p><p className="text-xs text-muted-foreground">Light is the default</p></div>
+        <div className="flex rounded-md bg-muted p-0.5" role="radiogroup" aria-label="Appearance">
+          {(["light", "dark", "system"] as Theme[]).map((t) => (
+            <button key={t} type="button" role="radio" aria-checked={theme === t} onClick={() => setTheme(t)}
+              className={cn("rounded-[6px] px-3 py-1.5 text-[13px] capitalize transition-all", theme === t ? "bg-card font-semibold text-primary shadow-sm" : "text-muted-foreground hover:text-foreground")}>{t}</button>
+          ))}
+        </div>
+      </div>
       <div className="flex items-center gap-4">
         <div className="flex-1"><p className="text-[13px] font-medium">New problems per day</p><p className="text-xs text-muted-foreground">Reviews always come first</p></div>
         <div className="flex overflow-hidden rounded-md border border-border">

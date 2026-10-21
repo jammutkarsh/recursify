@@ -47,11 +47,11 @@ export function InfoTip({ text, label = "More info" }: { text: string; label?: s
 
 export function Banner({ title, body, action, onAction }: { title: string; body: string; action?: string; onAction?: () => void }) {
   return (
-    <section className="rounded-xl border border-primary bg-primary-tint px-5 py-4">
+    <section className="rounded-xl border border-primary/40 bg-primary-tint px-5 py-4 animate-in fade-in-0 slide-in-from-top-1 duration-300">
       <h2 className="text-base font-bold">{title}</h2>
       <p className="mt-1.5 text-[13px] text-foreground-2">{body}</p>
       {action ? (
-        <button type="button" onClick={onAction} className="mt-2.5 inline-flex items-center gap-2 rounded-md bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground hover:opacity-90">
+        <button type="button" onClick={onAction} className="mt-2.5 inline-flex items-center gap-2 rounded-md bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground transition hover:opacity-90 active:scale-[0.98]">
           {action}
         </button>
       ) : null}
@@ -73,7 +73,7 @@ export function GradeButtons({ intervals, onGrade }: { intervals: number[]; onGr
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       {GRADES.map(({ g, key, label, cls }, i) => (
-        <button key={g} type="button" onClick={() => onGrade(g)} className={cn("flex items-center justify-center gap-1.5 rounded-md border-2 py-2 text-[13px] hover:brightness-95", cls)}>
+        <button key={g} type="button" onClick={() => onGrade(g)} className={cn("flex items-center justify-center gap-1.5 rounded-md border-2 py-2 text-[13px] transition hover:-translate-y-px hover:shadow-sm active:translate-y-0 active:scale-[0.98]", cls)}>
           <span className="font-mono font-semibold">{key}</span>
           <span className="font-bold">{label}</span>
           <span className="font-mono text-[11px] text-muted-foreground">{intervals[i]}d</span>
@@ -92,3 +92,5 @@ export function Meta({ topic, difficulty, extra }: { topic?: string; difficulty:
 }
 
 export const describeDue = (daysLate: number) => (daysLate > 0 ? `${daysLate}d late` : daysLate === 0 ? "today" : `in ${-daysLate}d`);
+
+export const ago = (days: number) => (days <= 0 ? "today" : days === 1 ? "yesterday" : `${days}d ago`);
