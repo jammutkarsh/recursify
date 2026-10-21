@@ -4,7 +4,7 @@ import { LogoMark } from "@/components/app/AppShell";
 import { HomePolygon } from "@/components/app/HomePolygon";
 import { isPublicSite, isSignedIn } from "@/lib/auth";
 
-// Copy is verbatim from the Figma frame "Home — SEO & meta (for build)".
+// Copy is verbatim from the design spec; keep it in sync there.
 const ORIGIN = "https://recursify.utkarshchourasia.in";
 const TITLE = "Recursify: LeetCode Tracker with Spaced Repetition";
 const DESCRIPTION = "Free, self-hosted LeetCode tracker that brings problems back right before you forget them. FSRS spaced repetition for NeetCode 150, Blind 75 and your own lists.";

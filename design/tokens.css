@@ -1,8 +1,7 @@
 /*
  * Recursify design tokens — light → dark mapping.
- * Source of truth for colours. Screens are designed in light only:
- * Figma KeyG3THsnvKLlsiMzZyn0e, page "Hi-fi" ("Today — dark" is the one reference dark screen).
- * Build dark mode by swapping these variables, never by designing dark screens.
+ * Source of truth for colours. Screens are designed in light only;
+ * dark mode swaps these variables rather than using separate dark designs.
  *
  * Names follow the shadcn convention already used in src/index.css, so they drop
  * into `@theme inline` as `--color-*`. Replace the old amber palette entirely —

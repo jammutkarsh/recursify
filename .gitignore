@@ -34,3 +34,6 @@ dist
 .dev.vars*
 !.dev.vars.example
 next-env.d.ts
+
+# Private design brief
+design/BUILD.md

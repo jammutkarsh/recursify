@@ -64,4 +64,4 @@ Local D1 data is stored under `.wrangler/` and never touches your deployed data.
 
 - `/today`, `/library`, `/progress` need sign-in. `/login` checks your token against `SITE_TOKEN` and stores it in an httpOnly cookie.
 - Data lives in D1: custom problems, My list, settings, and one row per solve or review. Scheduling state is never stored; it's rebuilt by replaying the review log (`src/lib/fsrs.ts`), so undo just deletes the last review.
-- Design reference: Figma file `KeyG3THsnvKLlsiMzZyn0e`, colours in `design/tokens.css`, build notes in `design/BUILD.md`.
+- Colours: `design/tokens.css`.
