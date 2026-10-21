@@ -1,6 +1,6 @@
 // Server-side data access. Every function assumes the caller already checked auth.
 import { builtinByTitle, builtinProblem, slugFromUrl, titleFromSlug, type Problem } from "./catalog";
-import { lookupLeetCode } from "./leetcode";
+import { lookupLeetCode, serverCatalogLookup } from "./leetcode";
 import { importRecords, toCsv } from "./csv";
 import { db } from "./db";
 import type { Difficulty, Grade } from "./fsrs";
@@ -60,6 +60,13 @@ export async function addToMyList(problemId: string) {
   await d.prepare("INSERT OR IGNORE INTO my_list (problem_id, added_at) VALUES (?, ?)").bind(problemId, new Date().toISOString()).run();
 }
 
+/** Statements that create a custom problem and put it on My list. */
+const insertCustom = (d: D1Database, id: string, input: Partial<Problem> & { title: string }, now: string) => [
+  d.prepare("INSERT INTO custom_problems (id, title, url, difficulty, topics, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .bind(id, input.title, input.url ?? null, asDifficulty(input.difficulty), JSON.stringify(input.topics ?? []), input.note ?? null, now),
+  d.prepare("INSERT OR IGNORE INTO my_list (problem_id, added_at) VALUES (?, ?)").bind(id, now),
+];
+
 /** Create (no id) or update a custom problem. `{ id: <builtin slug> }` alone adds a built-in problem to My list. */
 export async function saveProblem(input: Partial<Problem> & { title?: string }, id?: string) {
   const title = input.title?.trim();
@@ -68,12 +75,7 @@ export async function saveProblem(input: Partial<Problem> & { title?: string }, 
   const d = await db();
   if (!id) {
     const newId = `custom-${crypto.randomUUID()}`;
-    const now = new Date().toISOString();
-    await d.batch([
-      d.prepare("INSERT INTO custom_problems (id, title, url, difficulty, topics, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
-        .bind(newId, title, input.url ?? null, asDifficulty(input.difficulty), JSON.stringify(input.topics ?? []), input.note ?? null, now),
-      d.prepare("INSERT OR IGNORE INTO my_list (problem_id, added_at) VALUES (?, ?)").bind(newId, now),
-    ]);
+    await d.batch(insertCustom(d, newId, { ...input, title }, new Date().toISOString()));
     return newId;
   }
   const sets: string[] = [], vals: unknown[] = [];
@@ -119,7 +121,13 @@ export async function exportCsv() {
   return toCsv(rows);
 }
 
-/** Import rows (title*, url, difficulty, topic, note, reviewed_at, grade). Replays nothing: reviews are just appended; FSRS replays on read. */
+// Links the catalog doesn't know get a live lookup, capped so one import stays inside the Worker's subrequest limit
+// (50 per request on the free plan, D1 calls included). Any beyond the cap are titled from their slug.
+const LIVE_LOOKUPS = 10;
+// Writes go in batches (one D1 round trip and one transaction each), not one query per row.
+const BATCH = 200;
+
+/** Import rows (title or LeetCode url, difficulty, topic, note, reviewed_at, grade). Reviews are just appended; FSRS replays on read. */
 export async function importCsv(text: string) {
   const records = importRecords(text);
   const { customProblems, reviews, myList } = await loadAll();
@@ -128,30 +136,48 @@ export async function importCsv(text: string) {
   const bySlug = new Map(customProblems.flatMap((p) => { const s = p.url && slugFromUrl(p.url); return s ? [[s, p.id] as const] : []; }));
   const existing = new Set(reviews.map((r) => `${r.problemId}|${r.date}|${r.grade ?? ""}`));
   const result = { problems: 0, reviews: 0, skipped: 0, errors: [] as string[] };
+
+  // Metadata for new links: the bundled catalog first, then a few live lookups in parallel.
+  const meta = new Map<string, Omit<Problem, "id"> | null>();
+  for (const r of records) {
+    const slug = r.url ? slugFromUrl(r.url) : null;
+    if (slug && !builtinProblem(slug) && !bySlug.has(slug) && !meta.has(slug)) meta.set(slug, (await serverCatalogLookup(slug)) ?? null);
+  }
+  const live = [...meta].filter(([, m]) => !m).slice(0, LIVE_LOOKUPS).map(([slug]) => slug);
+  await Promise.all(live.map(async (slug) => meta.set(slug, await lookupLeetCode(slug))));
+
+  const d = await db();
+  const now = new Date().toISOString();
+  const writes: D1PreparedStatement[] = [];
   for (const [i, rec] of records.entries()) {
     try {
       const slug = rec.url ? slugFromUrl(rec.url) : null;
       if (!rec.title && !slug) throw new Error("needs a title or a LeetCode link");
+      if (rec.reviewed_at && !isDate(rec.reviewed_at)) throw new Error("reviewed_at must be YYYY-MM-DD");
+      const grade = rec.reviewed_at ? asGrade(rec.grade) : null;
       let id = slug && builtinProblem(slug) ? slug : (slug && bySlug.get(slug)) || (rec.title ? builtinByTitle(rec.title)?.id ?? byTitle.get(rec.title.toLowerCase()) : undefined);
       if (!id) {
-        const known = slug ? await lookupLeetCode(slug) : null; // blanks come from the LeetCode catalog (or a live lookup for newer problems)
+        const known = slug ? meta.get(slug) : null;
         const title = rec.title || known?.title || titleFromSlug(slug!);
-        id = await saveProblem({ title, url: rec.url || null, difficulty: (rec.difficulty || known?.difficulty) as Difficulty,
-          topics: rec.topic ? rec.topic.split(";").map((t) => t.trim()).filter(Boolean) : (known?.topics ?? []), note: rec.note || null });
+        id = `custom-${crypto.randomUUID()}`;
+        writes.push(...insertCustom(d, id, { title, url: rec.url || null, difficulty: (rec.difficulty || known?.difficulty) as Difficulty,
+          topics: rec.topic ? rec.topic.split(";").map((t) => t.trim()).filter(Boolean) : (known?.topics ?? []), note: rec.note || null }, now));
         byTitle.set(title.toLowerCase(), id); if (slug) bySlug.set(slug, id); result.problems++;
-      } else if (!rec.reviewed_at && !myListSet.has(id)) { await addToMyList(id); result.problems++; } // bare rows = list membership; review rows are history only
+      } else if (!rec.reviewed_at && !myListSet.has(id)) { // bare rows = list membership; review rows are history only
+        writes.push(d.prepare("INSERT OR IGNORE INTO my_list (problem_id, added_at) VALUES (?, ?)").bind(id, now)); result.problems++;
+      }
       myListSet.add(id);
       if (rec.reviewed_at) {
-        if (!isDate(rec.reviewed_at)) throw new Error(`reviewed_at must be YYYY-MM-DD`);
-        const g = asGrade(rec.grade);
-        const key = `${id}|${rec.reviewed_at}|${g ?? ""}`;
+        const key = `${id}|${rec.reviewed_at}|${grade ?? ""}`;
         if (existing.has(key)) { result.skipped++; continue; }
-        await addReview(id, rec.reviewed_at, g); existing.add(key); result.reviews++;
+        writes.push(d.prepare("INSERT INTO reviews (problem_id, reviewed_at, grade) VALUES (?, ?, ?)").bind(id, rec.reviewed_at, grade));
+        existing.add(key); result.reviews++;
       }
     } catch (e) {
       result.errors.push(`Row ${i + 2}: ${(e as Error).message}`);
     }
   }
+  for (let i = 0; i < writes.length; i += BATCH) await d.batch(writes.slice(i, i + BATCH));
   return result;
 }
 
