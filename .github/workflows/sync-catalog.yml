@@ -4,11 +4,14 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+# Commits to dev, so the catalog ships with the next release instead of deploying on its own.
 jobs:
   sync:
+    if: github.repository == 'jammutkarsh/recursify'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with: { ref: dev }
       - uses: oven-sh/setup-bun@v2
       - run: bun scripts/sync-catalog.ts
       - run: |

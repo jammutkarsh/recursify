@@ -1,0 +1,16 @@
+name: Release
+# Releases are pushed as `git push origin vX.Y.Z vX.Y.Z^{commit}:refs/heads/master` (see README).
+# Cloudflare Workers Builds deploys master, so only tagged code reaches production and forks' "Sync fork".
+on:
+  push:
+    tags: ["v*.*.*"]
+permissions:
+  contents: write
+jobs:
+  release:
+    if: github.repository == 'jammutkarsh/recursify'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish GitHub release
+        env: { GH_TOKEN: "${{ github.token }}", GH_REPO: "${{ github.repository }}" }
+        run: gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --generate-notes --verify-tag

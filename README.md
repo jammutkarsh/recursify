@@ -12,31 +12,33 @@ Not affiliated with LeetCode.
 
 ## Deploy your own
 
-You need a GitHub account and a free Cloudflare account.
+You need a GitHub account and a free Cloudflare account. Give your coding agent (Claude Code, Codex, Cursor, …) this link:
 
-1. **Fork** this repository.
-2. In the [Cloudflare dashboard](https://dash.cloudflare.com/?to=/:account/workers-and-pages), go to **Workers & Pages → Create → Import a repository** and pick your fork.
-3. Use these settings:
-   - Project name: `recursify` (must match `name` in `cloudflare.config.ts`)
-   - Build command: _leave empty_
-   - Deploy command: `bun run deploy` (runs `cf deploy`; not `npx wrangler deploy`, which rejects this build output)
-4. Click **Deploy**. The D1 database is created on the first deploy, and the app creates its own tables on first use.
-5. Set your password, `SITE_TOKEN`: a long random string (at least 24 characters), for example the output of `openssl rand -hex 32`. Placeholder values are refused. Either:
-   - add it under **Settings → Build → Variables and secrets** (it's deployed as a plain-text variable on every build), or
-   - add it as a **Secret** under **Settings → Variables and Secrets** (encrypted; can't be read back).
-6. Visit your `*.workers.dev` URL and sign in with `SITE_TOKEN`.
+```
+https://raw.githubusercontent.com/jammutkarsh/recursify/master/DEPLOY.md
+```
 
-Every push to your fork's `master` branch redeploys.
+It checks your tools and logins, forks this repo, deploys it to Cloudflare Workers with a D1 database, verifies the deployment, and hands you your URL and password (`SITE_TOKEN`). [DEPLOY.md](DEPLOY.md) is also readable by people who'd rather run the steps themselves.
 
 ### Updates
 
-New versions are tagged releases on `master`. To update, click **Sync fork** on your fork's GitHub page; Cloudflare redeploys automatically. Your data lives in D1, not in the repo, so syncing never touches it.
+`master` only ever holds tagged releases. To update, click **Sync fork** on your fork's GitHub page; Cloudflare redeploys automatically if you connected builds (DEPLOY.md step 7). Your data lives in D1, not in the repo, so syncing never touches it.
 
 ### Optional variables
 
 | Variable      | Purpose |
 | ------------- | ------- |
-| `PUBLIC_SITE` | Build variable (or Secret). Set to `true` only on the official site. It shows the marketing home page and allows search indexing. Every other deployment opens straight to sign-in and sends `noindex`. |
+| `PUBLIC_SITE` | Build variable. Set to `true` only on the official site. It shows the marketing home page and allows search indexing. Every other deployment opens straight to sign-in and sends `noindex`. |
+
+## Releasing (maintainers)
+
+Work happens on `dev`. To release, tag a commit on `dev` and push the tag and `master` together:
+
+```bash
+git tag v1.2.0 && git push origin v1.2.0 'v1.2.0^{commit}:refs/heads/master'
+```
+
+The push fails unless it fast-forwards `master`, and the `Release` workflow publishes the GitHub release notes. Cloudflare builds only `master`, so production and every fork's Sync fork only ever see tagged code. The weekly LeetCode catalog refresh commits to `dev` and ships with the next release; problems newer than the release's catalog are looked up live (`/api/lookup`) when someone logs them.
 
 ## Local development
 
