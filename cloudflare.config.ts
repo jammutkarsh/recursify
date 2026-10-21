@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => ({
       // No id in the repo: `cf deploy` creates the database on first deploy, so
       // nothing user-specific lives here and forks sync cleanly (D1_DATABASE_ID: see above).
       // Tables are created by the Worker itself (src/lib/db.ts).
-      DB: bindings.d1({ name: "recursify", ...(process.env.D1_DATABASE_ID && { id: process.env.D1_DATABASE_ID }) }),
+      DB: bindings.d1(process.env.D1_DATABASE_ID ? { id: process.env.D1_DATABASE_ID } : { name: "recursify" }),
       // In production these come from the Workers Builds build variables of the same
       // name and are deployed as plain-text vars. Locally they're read from .dev.vars.
       // When a build variable is absent the binding is left undeclared, so a
