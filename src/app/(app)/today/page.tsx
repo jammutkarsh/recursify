@@ -11,7 +11,7 @@ import { useApp } from "@/context/AppData";
 import { BUILTIN_LISTS, builtinProblem, slugFromUrl, type Problem } from "@/lib/catalog";
 import { gradeIntervals, type Tracked } from "@/lib/derive";
 import { daysBetween, type Difficulty } from "@/lib/fsrs";
-import { lookupLeetCode } from "@/lib/leetcode";
+import { loadCatalog, searchCatalog, type CatalogProblem } from "@/lib/leetcode";
 import { cn } from "@/lib/utils";
 
 const POLY_TIP = "Each wedge is a topic across all the lists you follow; a problem in several lists counts once. Greener = more of it solved. Hover a wedge for its stats; click it to open that topic in Library.";
@@ -87,7 +87,7 @@ function TopBanner() {
   );
 }
 
-type Pick = { kind: "problem"; p: Problem } | { kind: "link"; slug: string } | { kind: "new"; title: string };
+type Pick = { kind: "problem"; p: Problem } | { kind: "catalog"; p: CatalogProblem } | { kind: "link"; slug: string } | { kind: "new"; title: string };
 
 function TodaySection() {
   const app = useApp();
@@ -100,6 +100,9 @@ function TodaySection() {
   const [open, setOpen] = useState(false);
   const [pendingGrade, setPendingGrade] = useState<string[]>([]); // tracked problems logged today, awaiting a grade
   const [busy, setBusy] = useState(false);
+  const [catalog, setCatalog] = useState<Map<string, CatalogProblem> | null>(null);
+  // Every LeetCode problem, fetched only once the log box is in use.
+  useEffect(() => { if (open || q) loadCatalog().then(setCatalog, () => {}); }, [open, q]);
 
   useEffect(() => {
     const focus = () => { setOpen(true); requestAnimationFrame(() => inputRef.current?.focus()); };
@@ -112,11 +115,18 @@ function TodaySection() {
   const picks = useMemo<Pick[]>(() => {
     if (!query) return [];
     const slug = slugFromUrl(query);
-    if (slug) return [builtinProblem(slug) ? { kind: "problem" as const, p: builtinProblem(slug)! } : { kind: "link" as const, slug }];
+    const custom = data?.customProblems ?? [];
+    const copies = new Map(custom.flatMap((p) => { const s = p.url && slugFromUrl(p.url); return s ? [[s, p] as const] : []; })); // catalog problems already added
+    if (slug) {
+      const known = builtinProblem(slug) ?? copies.get(slug);
+      return [known ? { kind: "problem" as const, p: known } : catalog?.has(slug) ? { kind: "catalog" as const, p: catalog.get(slug)! } : { kind: "link" as const, slug }];
+    }
     const ql = query.toLowerCase();
-    const found = [...ALL, ...(data?.customProblems ?? [])].filter((p) => p.title.toLowerCase().includes(ql)).slice(0, 5).map((p) => ({ kind: "problem" as const, p }));
-    return found.some((f) => f.p.title.toLowerCase() === ql) ? found : [...found, { kind: "new" as const, title: query }];
-  }, [query, data]);
+    const found: Pick[] = [...ALL, ...custom].filter((p) => p.title.toLowerCase().includes(ql)).slice(0, 5).map((p) => ({ kind: "problem" as const, p }));
+    const skip = new Set([...found.map((f) => (f as { p: Problem }).p.id), ...copies.keys()]);
+    found.push(...searchCatalog(catalog, query, skip, 5 - found.length).map((p) => ({ kind: "catalog" as const, p })));
+    return found.some((f) => "p" in f && f.p.title.toLowerCase() === ql) ? found : [...found, { kind: "new" as const, title: query }];
+  }, [query, data, catalog]);
 
   if (!model || !data) return null;
 
@@ -127,9 +137,8 @@ function TodaySection() {
         const t = model.tracked.get(pick.p.id);
         if (t && t.card.lastReview !== today) setPendingGrade((s) => [pick.p.id, ...s.filter((x) => x !== pick.p.id)]);
         else if (!t) await app.logSolve(pick.p.id);
-      } else if (pick.kind === "link") {
-        const meta = await lookupLeetCode(pick.slug);
-        const id = await app.addCustom(meta ?? { title: pick.slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()), url: `https://leetcode.com/problems/${pick.slug}/` });
+      } else if (pick.kind === "catalog" || pick.kind === "link") {
+        const id = await app.addLeetCode(pick.kind === "link" ? pick.slug : pick.p.id);
         if (id) await app.logSolve(id);
       } else {
         const id = await app.addCustom({ title: pick.title });
@@ -179,7 +188,10 @@ function TodaySection() {
             {picks.map((pick, i) => (
               <button key={i} type="button" role="option" aria-selected={sel === i} onMouseEnter={() => setSel(i)} onClick={() => choose(pick)}
                 className={cn("flex w-full items-center gap-3 px-4 py-2.5 text-left", sel === i && "bg-primary-tint")}>
-                {pick.kind === "problem" ? <>
+                {pick.kind === "catalog" ? <>
+                  <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{pick.p.number}. {pick.p.title}</span><Meta topic={pick.p.topics[0]} difficulty={pick.p.difficulty} extra={pick.p.paid ? "Premium" : undefined} /></span>
+                  <span className="font-mono text-[11px] font-semibold text-muted-foreground">NEW</span>
+                </> : pick.kind === "problem" ? <>
                   <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{pick.p.title}</span><Meta topic={pick.p.topics[0]} difficulty={pick.p.difficulty} /></span>
                   <span className="font-mono text-[11px] font-semibold text-muted-foreground">{model.tracked.has(pick.p.id) ? "TRACKED" : "NEW"}</span>
                 </> : pick.kind === "link" ? <span className="flex-1 text-sm font-semibold text-primary">+ Add LeetCode problem “{pick.slug}”</span>

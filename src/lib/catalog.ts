@@ -67,6 +67,10 @@ const ALIASES: Record<string, string> = {
   "1-d dynamic programming": "1-D DP", "dp - 1d": "1-D DP", "dynamic programming": "1-D DP",
   "2-d dynamic programming": "2-D DP", "dp - multidimensional": "2-D DP",
   "math": "Math & Geometry", "geometry": "Math & Geometry", "bit manipulation": "Bit Manipulation",
+  // LeetCode tag names (catalog problems' first tag)
+  "hash table": "Arrays & Hashing", "string": "Arrays & Hashing", "sorting": "Arrays & Hashing", "binary tree": "Trees",
+  "heap (priority queue)": "Heap/Priority Queue", "graph theory": "Graphs", "depth-first search": "Graphs", "breadth-first search": "Graphs",
+  "union find": "Graphs", "union-find": "Graphs", "topological sort": "Advanced Graphs", "shortest path": "Advanced Graphs", "minimum spanning tree": "Advanced Graphs",
 };
 const CANON = new Map(NEETCODE_ORDER.map((n) => [n.toLowerCase(), n]));
 export const canonicalTopic = (name: string) => CANON.get(name.toLowerCase()) ?? ALIASES[name.toLowerCase()] ?? name;

@@ -1,5 +1,6 @@
 // Server-side data access. Every function assumes the caller already checked auth.
 import { builtinByTitle, builtinProblem, slugFromUrl, type Problem } from "./catalog";
+import { serverCatalogLookup } from "./leetcode";
 import { csvRecords, toCsv } from "./csv";
 import { db } from "./db";
 import type { Difficulty, Grade } from "./fsrs";
@@ -133,7 +134,9 @@ export async function importCsv(text: string) {
       const slug = rec.url ? slugFromUrl(rec.url) : null;
       let id = slug && builtinProblem(slug) ? slug : (builtinByTitle(rec.title)?.id ?? byTitle.get(rec.title.toLowerCase()));
       if (!id) {
-        id = await saveProblem({ title: rec.title, url: rec.url || null, difficulty: rec.difficulty as Difficulty, topics: rec.topic ? rec.topic.split(";").map((t) => t.trim()).filter(Boolean) : [], note: rec.note || null });
+        const known = slug ? await serverCatalogLookup(slug) : undefined; // fill blanks from the LeetCode catalog
+        id = await saveProblem({ title: rec.title, url: rec.url || null, difficulty: (rec.difficulty || known?.difficulty) as Difficulty,
+          topics: rec.topic ? rec.topic.split(";").map((t) => t.trim()).filter(Boolean) : (known?.topics ?? []), note: rec.note || null });
         byTitle.set(rec.title.toLowerCase(), id); result.problems++;
       } else if (!rec.reviewed_at && !myListSet.has(id)) { await addToMyList(id); result.problems++; } // bare rows = list membership; review rows are history only
       myListSet.add(id);

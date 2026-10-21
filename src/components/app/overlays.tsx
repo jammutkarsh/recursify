@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useApp } from "@/context/AppData";
-import { BUILTIN_LISTS, builtinProblem, type Problem } from "@/lib/catalog";
+import { BUILTIN_LISTS, builtinProblem, slugFromUrl, type Problem } from "@/lib/catalog";
+import { loadCatalog, searchCatalog, type CatalogProblem } from "@/lib/leetcode";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { useTheme, type Theme } from "@/lib/theme";
@@ -27,17 +28,21 @@ const ALL_PROBLEMS: Problem[] = [...new Map(BUILTIN_LISTS.flatMap((l) => l.secti
 
 /** Header search results: topics, problems, add action. ↑↓ move, ↵ open, Tab = all results in Library. */
 export function SearchPanel({ query, onClose }: { query: string; onClose: () => void }) {
-  const { model, data, addCustom } = useApp();
+  const { model, data, addCustom, addLeetCode } = useApp();
   const router = useRouter();
   const [sel, setSel] = useState(0);
+  const [catalog, setCatalog] = useState<Map<string, CatalogProblem> | null>(null);
   const q = query.trim().toLowerCase();
-  type R = { kind: "topic"; name: string; total: number } | { kind: "problem"; p: Problem } | { kind: "add" };
+  useEffect(() => { if (q) loadCatalog().then(setCatalog, () => {}); }, [q]);
+  type R = { kind: "topic"; name: string; total: number } | { kind: "problem"; p: Problem } | { kind: "leetcode"; p: CatalogProblem } | { kind: "add" };
   const results = useMemo<R[]>(() => {
     if (!q || !model || !data) return [];
     const topics = model.polygon.filter((s) => s.name.toLowerCase().includes(q)).slice(0, 3).map((s) => ({ kind: "topic" as const, name: s.name, total: s.total }));
     const problems = [...ALL_PROBLEMS, ...data.customProblems].filter((p) => p.title.toLowerCase().includes(q)).slice(0, 6).map((p) => ({ kind: "problem" as const, p }));
-    return [...topics, ...problems, { kind: "add" as const }];
-  }, [q, model, data]);
+    const skip = new Set([...problems.map((r) => r.p.id), ...data.customProblems.map((p) => (p.url && slugFromUrl(p.url)) || "")]);
+    const leetcode = searchCatalog(catalog, q, skip, 4).map((p) => ({ kind: "leetcode" as const, p }));
+    return [...topics, ...problems, ...leetcode, { kind: "add" as const }];
+  }, [q, model, data, catalog]);
   useEffect(() => setSel(0), [q]);
 
   const open = async (i: number) => {
@@ -45,6 +50,7 @@ export function SearchPanel({ query, onClose }: { query: string; onClose: () => 
     onClose();
     if (r.kind === "topic") router.push(`/library?topic=${encodeURIComponent(r.name)}`);
     else if (r.kind === "problem") router.push(`/library?p=${encodeURIComponent(r.p.id)}`);
+    else if (r.kind === "leetcode") { const id = await addLeetCode(r.p.id); if (id) router.push(`/library?p=${encodeURIComponent(id)}`); }
     else { const id = await addCustom({ title: query.trim() }); if (id) router.push(`/library?p=${id}`); }
   };
   useKey((e) => {
@@ -57,7 +63,7 @@ export function SearchPanel({ query, onClose }: { query: string; onClose: () => 
   if (!q) return null;
 
   const hl = (title: string) => { const i = title.toLowerCase().indexOf(q); return i < 0 ? title : <>{title.slice(0, i)}<b className="font-semibold text-primary">{title.slice(i, i + q.length)}</b>{title.slice(i + q.length)}</>; };
-  const label = { topic: "TOPICS", problem: "PROBLEMS", add: "ACTIONS" } as const;
+  const label = { topic: "TOPICS", problem: "PROBLEMS", leetcode: "ALL LEETCODE", add: "ACTIONS" } as const;
   return (
     <div className="absolute top-full left-1/2 z-50 mt-2 w-[560px] max-w-[calc(100vw-32px)] -translate-x-1/2 overflow-hidden rounded-xl border border-border bg-card shadow-2xl animate-in fade-in-0 slide-in-from-top-1 duration-150">
       {results.map((r, i) => {
@@ -69,6 +75,8 @@ export function SearchPanel({ query, onClose }: { query: string; onClose: () => 
               {r.kind === "topic" ? <><span className="size-3 rounded-[3px] bg-heat-3" /><span className="flex-1 text-sm font-medium">{hl(r.name)}</span><span className="text-xs text-muted-foreground">{r.total} problems · open in Library</span></> : null}
               {r.kind === "problem" ? <><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{hl(r.p.title)}</span><Meta topic={r.p.topics[0]} difficulty={r.p.difficulty} /></span>
                 <span className={cn("font-mono text-xs", t && t.daysLate > 0 ? "font-semibold text-forgot-text" : "text-muted-foreground")}>{t ? describeDue(t.daysLate) : "not solved"}</span></> : null}
+              {r.kind === "leetcode" ? <><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{r.p.number}. {hl(r.p.title)}</span><Meta topic={r.p.topics[0]} difficulty={r.p.difficulty} extra={r.p.paid ? "Premium" : undefined} /></span>
+                <span className="text-xs text-muted-foreground">add to My list</span></> : null}
               {r.kind === "add" ? <span className="text-sm font-medium text-primary">+ Add “{query.trim()}” to My list</span> : null}
               {sel === i ? <Kbd>↵</Kbd> : null}
             </button>

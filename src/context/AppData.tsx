@@ -1,9 +1,10 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { Problem } from "@/lib/catalog";
+import { builtinProblem, slugFromUrl, type Problem } from "@/lib/catalog";
 import { buildModel, type AppData, type Model } from "@/lib/derive";
 import type { Grade } from "@/lib/fsrs";
+import { loadCatalog } from "@/lib/leetcode";
 import type { ReviewRow, Settings } from "@/lib/settings";
 
 export const localToday = () => {
@@ -24,6 +25,7 @@ interface Ctx {
   grade: (problemId: string, grade: Grade) => Promise<void>;
   undo: () => Promise<void>;
   addCustom: (p: Partial<Problem> & { title: string }) => Promise<string | null>;
+  addLeetCode: (slug: string) => Promise<string | null>;
   addToMyList: (problemId: string) => Promise<void>;
   updateProblem: (id: string, patch: Partial<Problem>) => Promise<void>;
   deleteProblem: (id: string) => Promise<void>;
@@ -110,6 +112,17 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     } catch (e) { setToast({ kind: "error", message: (e as Error).message }); return null; }
   }, []);
 
+  /** The id to log for a LeetCode slug: built-in, an existing custom copy, or a new custom problem filled from the catalog / lookup. */
+  const addLeetCode = useCallback(async (slug: string) => {
+    if (builtinProblem(slug)) return slug;
+    const existing = dataRef.current?.customProblems.find((p) => p.url && slugFromUrl(p.url) === slug);
+    if (existing) return existing.id;
+    const hit = (await loadCatalog().catch(() => null))?.get(slug);
+    const meta = hit ? { title: hit.title, url: hit.url, difficulty: hit.difficulty, topics: hit.topics }
+      : (await api<{ problem: Omit<Problem, "id"> | null }>(`/api/lookup?slug=${encodeURIComponent(slug)}`).catch(() => ({ problem: null }))).problem;
+    return addCustom(meta ?? { title: slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()), url: `https://leetcode.com/problems/${slug}/` });
+  }, [addCustom]);
+
   const addToMyList = useCallback((problemId: string) =>
     optimistic((d) => ({ ...d, myList: d.myList.includes(problemId) ? d.myList : [...d.myList, problemId] }), () => api("/api/problems", { method: "POST", json: { id: problemId } }).then(() => {})), [optimistic]);
 
@@ -130,8 +143,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const saveSettings = useCallback((patch: Partial<Settings>) =>
     optimistic((d) => ({ ...d, settings: { ...d.settings, ...patch } }), () => api("/api/settings", { method: "PUT", json: patch }).then(() => {})), [optimistic]);
 
-  const value = useMemo<Ctx>(() => ({ data, model, today, error, toast, setToast, logSolve, grade, undo, addCustom, addToMyList, updateProblem, deleteProblem, resetProblem, saveSettings, reload }),
-    [data, model, today, error, toast, logSolve, grade, undo, addCustom, addToMyList, updateProblem, deleteProblem, resetProblem, saveSettings, reload]);
+  const value = useMemo<Ctx>(() => ({ data, model, today, error, toast, setToast, logSolve, grade, undo, addCustom, addLeetCode, addToMyList, updateProblem, deleteProblem, resetProblem, saveSettings, reload }),
+    [data, model, today, error, toast, logSolve, grade, undo, addCustom, addLeetCode, addToMyList, updateProblem, deleteProblem, resetProblem, saveSettings, reload]);
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;
 }
 
