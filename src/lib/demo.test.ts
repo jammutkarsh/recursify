@@ -17,6 +17,9 @@ test("demo store seeds believable history and answers the app's API from localSt
 
   const out = await demoApi<{ problems: number; reviews: number }>("/api/import", { method: "POST", body: "title,reviewed_at,grade\nMy Puzzle,2026-01-02,instant\n" });
   expect(out).toMatchObject({ problems: 1, reviews: 1 });
+  const byLink = await demoApi<{ problems: number }>("/api/import", { method: "POST", body: "https://leetcode.com/problems/lru-cache/\n" }); // built-in, no title given
+  expect(byLink.problems).toBe(1);
+  expect((await demoApi<AppData>("/api/data")).myList).toContain("lru-cache");
 
   await expect(demoApi("/api/data", { method: "DELETE" })).rejects.toThrow("Not available in the demo"); // no reset in the demo
   await expect(demoApi("/api/export")).rejects.toThrow("Not available in the demo");

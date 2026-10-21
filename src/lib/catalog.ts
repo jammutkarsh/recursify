@@ -45,12 +45,12 @@ export const BUILTIN_LISTS: ListDef[] = [
 export const builtinProblem = (id: string) => problems.get(id);
 export const builtinByTitle = (title: string) => [...problems.values()].find((p) => p.title.toLowerCase() === title.toLowerCase());
 
-/** The user's custom list, shaped like a built-in one. Sections = first topic. */
+/** The user's custom list, shaped like a built-in one: grouped into the same topics as the built-in lists. */
 export const customList = (custom: Problem[]): ListDef => ({
   id: CUSTOM_LIST_ID,
   name: "My list",
   custom: true,
-  sections: custom.map((p) => ({ id: p.id, section: p.topics[0] ?? "Uncategorised" })),
+  sections: inTopicOrder(custom.map((p) => ({ id: p.id, section: topicOf(p.id, p.topics[0] ?? UNCATEGORISED) }))),
 });
 
 // Topic names differ per list; map them onto NeetCode's so one polygon can combine lists.
@@ -76,18 +76,27 @@ const CANON = new Map(NEETCODE_ORDER.map((n) => [n.toLowerCase(), n]));
 export const canonicalTopic = (name: string) => CANON.get(name.toLowerCase()) ?? ALIASES[name.toLowerCase()] ?? name;
 
 export const FOLLOWED_LIST_ID = "followed";
+const UNCATEGORISED = "Uncategorised";
 
-/** One list made of every followed list: each problem once, under its canonical topic (NeetCode's when it's in NeetCode). */
+/** A problem's canonical topic: NeetCode's section when it's in NeetCode 150, else its own topic mapped onto NeetCode's names. */
+const NEETCODE_SECTION = new Map(BUILTIN_LISTS[0].sections.map((s) => [s.id, s.section]));
+const topicOf = (id: string, section: string) => NEETCODE_SECTION.get(id) ?? canonicalTopic(section);
+/** NeetCode's topic order; other topics after it, alphabetically, and Uncategorised last. Stable within a topic. */
+const inTopicOrder = (sections: ListDef["sections"]) => {
+  const rank = (t: string) => { const i = NEETCODE_ORDER.indexOf(t); return i >= 0 ? i : t === UNCATEGORISED ? Infinity : NEETCODE_ORDER.length; };
+  return [...sections].sort((a, b) => rank(a.section) - rank(b.section) || (rank(a.section) === NEETCODE_ORDER.length ? a.section.localeCompare(b.section) : 0));
+};
+
+/** One list made of every followed list: each problem once, under its canonical topic. */
 export function combineLists(lists: ListDef[]): ListDef {
-  const nc = new Map(BUILTIN_LISTS[0].sections.map((s) => [s.id, s.section]));
   const seen = new Map<string, string>();
-  for (const l of lists) for (const s of l.sections) if (!seen.has(s.id)) seen.set(s.id, nc.get(s.id) ?? canonicalTopic(s.section));
-  const rank = (t: string) => { const i = NEETCODE_ORDER.indexOf(t); return i < 0 ? NEETCODE_ORDER.length : i; };
-  const sections = [...seen].map(([id, section]) => ({ id, section })).sort((a, b) => rank(a.section) - rank(b.section));
-  return { id: FOLLOWED_LIST_ID, name: "All followed lists", sections };
+  for (const l of lists) for (const s of l.sections) if (!seen.has(s.id)) seen.set(s.id, topicOf(s.id, s.section));
+  return { id: FOLLOWED_LIST_ID, name: "All followed lists", sections: inTopicOrder([...seen].map(([id, section]) => ({ id, section }))) };
 }
 
 /** Ordered unique sections of a list = polygon wedges. */
 export const sectionsOf = (list: ListDef) => [...new Set(list.sections.map((s) => s.section))];
 
 export const slugFromUrl = (input: string) => input.match(/leetcode\.com\/problems\/([^/?#]+)/)?.[1] ?? null;
+/** Last-resort title for a LeetCode slug nobody could look up: "two-sum" → "Two Sum". */
+export const titleFromSlug = (slug: string) => slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());

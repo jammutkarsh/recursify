@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { builtinProblem, slugFromUrl, type Problem } from "@/lib/catalog";
+import { builtinProblem, slugFromUrl, titleFromSlug, type Problem } from "@/lib/catalog";
 import { buildModel, type AppData, type Model } from "@/lib/derive";
 import type { Grade } from "@/lib/fsrs";
 import { DEMO, demoApi } from "@/lib/demo";
@@ -122,7 +122,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     const hit = (await loadCatalog().catch(() => null))?.get(slug);
     const meta = hit ? { title: hit.title, url: hit.url, difficulty: hit.difficulty, topics: hit.topics }
       : (await api<{ problem: Omit<Problem, "id"> | null }>(`/api/lookup?slug=${encodeURIComponent(slug)}`).catch(() => ({ problem: null }))).problem;
-    return addCustom(meta ?? { title: slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()), url: `https://leetcode.com/problems/${slug}/` });
+    return addCustom(meta ?? { title: titleFromSlug(slug), url: `https://leetcode.com/problems/${slug}/` });
   }, [addCustom]);
 
   const addToMyList = useCallback((problemId: string) =>

@@ -8,7 +8,7 @@ Recursify brings each LeetCode problem back right before you'd forget it, and sh
 - **Topic polygon.** One wedge per topic of your list, greener as you solve more.
 - **Lists.** Blind 75, LeetCode 75 and NeetCode 150 are built in, plus My list for your own problems, LeetCode or not. Follow several at once.
 - **Keyboard-first.** `J`/`K` move, `1`–`4` grade, `A` log a solve, `/` search, `?` shows every shortcut.
-- **CSV import and export** (`title, url, difficulty, topic, note, reviewed_at, grade`).
+- **CSV import and export** (`title, url, difficulty, topic, note, reviewed_at, grade`). A LeetCode link alone is enough (even a plain list of links, one per line): title, difficulty and topic come from the bundled catalog of every LeetCode problem. `topic` sets the section in My list; LeetCode and NeetCode topic names are grouped like the built-in lists.
 
 Not affiliated with LeetCode.
 

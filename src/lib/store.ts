@@ -1,7 +1,7 @@
 // Server-side data access. Every function assumes the caller already checked auth.
-import { builtinByTitle, builtinProblem, slugFromUrl, type Problem } from "./catalog";
-import { serverCatalogLookup } from "./leetcode";
-import { csvRecords, toCsv } from "./csv";
+import { builtinByTitle, builtinProblem, slugFromUrl, titleFromSlug, type Problem } from "./catalog";
+import { lookupLeetCode } from "./leetcode";
+import { importRecords, toCsv } from "./csv";
 import { db } from "./db";
 import type { Difficulty, Grade } from "./fsrs";
 import { DEFAULT_SETTINGS, type ReviewRow, type Settings } from "./settings";
@@ -121,23 +121,24 @@ export async function exportCsv() {
 
 /** Import rows (title*, url, difficulty, topic, note, reviewed_at, grade). Replays nothing: reviews are just appended; FSRS replays on read. */
 export async function importCsv(text: string) {
-  const records = csvRecords(text);
-  if (records.length && !("title" in records[0])) throw new Error('No "title" column found.');
+  const records = importRecords(text);
   const { customProblems, reviews, myList } = await loadAll();
   const myListSet = new Set(myList);
   const byTitle = new Map(customProblems.map((p) => [p.title.toLowerCase(), p.id]));
+  const bySlug = new Map(customProblems.flatMap((p) => { const s = p.url && slugFromUrl(p.url); return s ? [[s, p.id] as const] : []; }));
   const existing = new Set(reviews.map((r) => `${r.problemId}|${r.date}|${r.grade ?? ""}`));
   const result = { problems: 0, reviews: 0, skipped: 0, errors: [] as string[] };
   for (const [i, rec] of records.entries()) {
     try {
-      if (!rec.title) throw new Error("title missing");
       const slug = rec.url ? slugFromUrl(rec.url) : null;
-      let id = slug && builtinProblem(slug) ? slug : (builtinByTitle(rec.title)?.id ?? byTitle.get(rec.title.toLowerCase()));
+      if (!rec.title && !slug) throw new Error("needs a title or a LeetCode link");
+      let id = slug && builtinProblem(slug) ? slug : (slug && bySlug.get(slug)) || (rec.title ? builtinByTitle(rec.title)?.id ?? byTitle.get(rec.title.toLowerCase()) : undefined);
       if (!id) {
-        const known = slug ? await serverCatalogLookup(slug) : undefined; // fill blanks from the LeetCode catalog
-        id = await saveProblem({ title: rec.title, url: rec.url || null, difficulty: (rec.difficulty || known?.difficulty) as Difficulty,
+        const known = slug ? await lookupLeetCode(slug) : null; // blanks come from the LeetCode catalog (or a live lookup for newer problems)
+        const title = rec.title || known?.title || titleFromSlug(slug!);
+        id = await saveProblem({ title, url: rec.url || null, difficulty: (rec.difficulty || known?.difficulty) as Difficulty,
           topics: rec.topic ? rec.topic.split(";").map((t) => t.trim()).filter(Boolean) : (known?.topics ?? []), note: rec.note || null });
-        byTitle.set(rec.title.toLowerCase(), id); result.problems++;
+        byTitle.set(title.toLowerCase(), id); if (slug) bySlug.set(slug, id); result.problems++;
       } else if (!rec.reviewed_at && !myListSet.has(id)) { await addToMyList(id); result.problems++; } // bare rows = list membership; review rows are history only
       myListSet.add(id);
       if (rec.reviewed_at) {

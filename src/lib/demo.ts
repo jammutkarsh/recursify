@@ -1,9 +1,10 @@
 // The public demo (built with NEXT_PUBLIC_DEMO=true): no sign-in, no D1. The app's /api calls are answered
 // here from localStorage instead, so each visitor gets a private sandbox that lives only in their browser.
-import { BUILTIN_LISTS, builtinByTitle, builtinProblem, slugFromUrl, type Problem } from "./catalog";
-import { csvRecords, toCsv } from "./csv";
+import { BUILTIN_LISTS, builtinByTitle, builtinProblem, slugFromUrl, titleFromSlug, type Problem } from "./catalog";
+import { importRecords, toCsv } from "./csv";
 import type { AppData } from "./derive";
 import { fromDay, toDay, type Difficulty, type Grade } from "./fsrs";
+import { loadCatalog } from "./leetcode";
 import { DEFAULT_SETTINGS } from "./settings";
 
 export const DEMO = process.env.NEXT_PUBLIC_DEMO === "true";
@@ -47,16 +48,22 @@ function addProblem(s: Store, p: Partial<Problem> & { title: string }) {
   return id;
 }
 
-/** Same rules as the server's importCsv, against the local store. */
-function importCsv(s: Store, text: string) {
+/** Same rules as the server's importCsv, against the local store (blanks filled from the catalog, no live lookup). */
+async function importCsv(s: Store, text: string) {
   const out = { problems: 0, reviews: 0, skipped: 0, errors: [] as string[] };
-  const records = csvRecords(text);
-  if (records.length && !("title" in records[0])) throw new Error('No "title" column found.');
+  const records = importRecords(text);
+  const catalog = records.some((r) => !r.title) ? await loadCatalog().catch(() => null) : null; // only link-only rows need it
   for (const [i, r] of records.entries()) {
-    if (!r.title) { out.errors.push(`Row ${i + 2}: title missing`); continue; }
     const slug = r.url ? slugFromUrl(r.url) : null;
-    let id = (slug && builtinProblem(slug) ? slug : builtinByTitle(r.title)?.id) ?? s.customProblems.find((p) => p.title.toLowerCase() === r.title.toLowerCase())?.id;
-    if (!id) { id = addProblem(s, { title: r.title, url: r.url || null, difficulty: r.difficulty as Difficulty, topics: r.topic ? r.topic.split(";").map((x) => x.trim()).filter(Boolean) : [], note: r.note || null }); out.problems++; }
+    if (!r.title && !slug) { out.errors.push(`Row ${i + 2}: needs a title or a LeetCode link`); continue; }
+    const copy = slug ? s.customProblems.find((p) => p.url && slugFromUrl(p.url) === slug)?.id : undefined;
+    let id = (slug && builtinProblem(slug) ? slug : copy) ?? (r.title ? builtinByTitle(r.title)?.id ?? s.customProblems.find((p) => p.title.toLowerCase() === r.title.toLowerCase())?.id : undefined);
+    if (!id) {
+      const known = slug ? catalog?.get(slug) : undefined;
+      id = addProblem(s, { title: r.title || known?.title || titleFromSlug(slug!), url: r.url || null, difficulty: (r.difficulty || known?.difficulty) as Difficulty,
+        topics: r.topic ? r.topic.split(";").map((x) => x.trim()).filter(Boolean) : (known?.topics ?? []), note: r.note || null });
+      out.problems++;
+    }
     else if (!r.reviewed_at && !s.myList.includes(id)) { s.myList.push(id); out.problems++; }
     if (!r.reviewed_at) continue;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(r.reviewed_at)) { out.errors.push(`Row ${i + 2}: reviewed_at must be YYYY-MM-DD`); continue; }
@@ -98,7 +105,7 @@ export async function demoApi<T>(path: string, init?: { method?: string; json?: 
     case "PATCH /api/problems": s.customProblems = s.customProblems.map((p) => (p.id === q("id") ? { ...p, ...b, id: p.id, custom: true } : p)); break;
     case "DELETE /api/problems": { const id = q("id"); s.reviews = s.reviews.filter((r) => r.problemId !== id); s.customProblems = s.customProblems.filter((p) => p.id !== id); s.myList = s.myList.filter((x) => x !== id); break; }
     case "PUT /api/settings": s.settings = { ...s.settings, ...(b as object) }; break;
-    case "POST /api/import": out = importCsv(s, String(init?.body ?? "")); break;
+    case "POST /api/import": out = await importCsv(s, String(init?.body ?? "")); break;
     default: throw new Error("Not available in the demo");
   }
   write(s);
