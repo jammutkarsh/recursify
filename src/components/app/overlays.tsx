@@ -150,7 +150,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const { theme, setTheme } = useTheme();
   const signOut = async () => { await fetch("/api/logout", { method: "POST" }); window.location.assign("/login"); };
   return (
-    <Overlay onClose={onClose} label="Settings" className="mt-[12vh] w-[560px] max-w-[calc(100vw-32px)] space-y-5 p-7">
+    <Overlay onClose={onClose} label="Settings" className="mt-[8vh] max-h-[84vh] w-[560px] max-w-[calc(100vw-32px)] space-y-5 overflow-y-auto p-7">
       <div className="flex items-center"><h2 className="flex-1 text-xl font-bold">Settings</h2><Kbd>Esc</Kbd></div>
       <div className="flex items-center gap-4">
         <div className="flex-1"><p className="text-[13px] font-medium">Appearance</p><p className="text-xs text-muted-foreground">Light is the default</p></div>
@@ -184,9 +184,52 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
         <span className="flex-1 text-[13px] font-medium">Data</span>
         <a href="/api/export" className="rounded-md border border-border px-3.5 py-2 text-[13px] font-semibold hover:bg-muted">Export CSV</a>
         <Link href="/library?import=1" onClick={onClose} className="rounded-md border border-border px-3.5 py-2 text-[13px] font-semibold hover:bg-muted">Import CSV</Link>
-        <button type="button" onClick={signOut} className="rounded-md border border-forgot px-3.5 py-2 text-[13px] font-semibold text-forgot-text hover:bg-forgot-tint">Sign out</button>
+        <button type="button" onClick={signOut} className="rounded-md border border-border px-3.5 py-2 text-[13px] font-semibold hover:bg-muted">Sign out</button>
       </div>
+      <ResetData />
       <p className="text-center text-xs text-muted-foreground">Recursify · made by <a className="underline-offset-2 hover:underline" href="https://x.com/jammutkarsh">@jammutkarsh</a></p>
     </Overlay>
+  );
+}
+
+const RESET_PHRASE = "delete all my data";
+
+function ResetData() {
+  const { reload, setToast } = useApp();
+  const [open, setOpen] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const ok = typed.trim().toLowerCase() === RESET_PHRASE;
+  const reset = async () => {
+    setBusy(true); setError(null);
+    try {
+      const res = await fetch("/api/data", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirm: typed }) });
+      const out = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(out.error ?? "Reset failed");
+      await reload();
+      setOpen(false); setTyped("");
+      setToast({ kind: "info", message: "All progress deleted. Starting fresh." });
+    } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  };
+  if (!open) return (
+    <div className="flex items-center gap-3 rounded-lg border border-forgot/40 px-4 py-3">
+      <div className="flex-1"><p className="text-[13px] font-medium text-forgot-text">Reset all progress</p><p className="text-xs text-muted-foreground">Deletes every review, custom problem, My list and your settings.</p></div>
+      <button type="button" onClick={() => setOpen(true)} className="rounded-md border border-forgot px-3.5 py-2 text-[13px] font-semibold text-forgot-text transition hover:bg-forgot-tint">Reset…</button>
+    </div>
+  );
+  return (
+    <div className="space-y-2.5 rounded-lg border border-forgot bg-forgot-tint px-4 py-3.5 animate-in fade-in-0 duration-200">
+      <p className="text-[13px] font-semibold text-forgot-text">This can&rsquo;t be undone.</p>
+      <p className="text-xs text-foreground-2">Export a CSV first if you might want your history back. To confirm, type <b className="font-mono">{RESET_PHRASE}</b> below.</p>
+      <input autoFocus value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && ok) reset(); }}
+        aria-label={`Type ${RESET_PHRASE} to confirm`} placeholder={RESET_PHRASE} spellCheck={false} autoComplete="off"
+        className="w-full rounded-md border border-forgot/50 bg-card px-3 py-2 font-mono text-sm outline-none focus:border-forgot" />
+      {error ? <p className="text-xs text-forgot-text" role="alert">{error}</p> : null}
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={() => { setOpen(false); setTyped(""); setError(null); }} className="rounded-md border border-border bg-card px-3.5 py-2 text-[13px] font-semibold">Cancel</button>
+        <button type="button" disabled={!ok || busy} onClick={reset} className="rounded-md bg-forgot px-3.5 py-2 text-[13px] font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-40">{busy ? "Deleting…" : "Delete everything"}</button>
+      </div>
+    </div>
   );
 }

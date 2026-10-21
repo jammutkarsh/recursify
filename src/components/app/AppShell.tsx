@@ -8,6 +8,7 @@ import { useTheme } from "@/lib/theme";
 import { useApp } from "@/context/AppData";
 import { cn } from "@/lib/utils";
 import { ListPicker, SearchPanel, SettingsDialog, ShortcutsDialog, useKey } from "./overlays";
+import { ToastBar } from "./ToastBar";
 import { Kbd, KeyHints } from "./ui";
 
 const RAMP = ["#216E39", "#30A14E", "#40C463", "#9BE9A8", "#EBEDF0", "#30A14E"];
@@ -114,6 +115,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </footer>
       ) : null}
       <MobileTabs path={path} onSettings={() => setDialog("settings")} />
+      <ToastBar />
       {dialog === "keys" ? <ShortcutsDialog onClose={() => setDialog(null)} /> : null}
       {dialog === "settings" ? <SettingsDialog onClose={() => setDialog(null)} /> : null}
     </div>

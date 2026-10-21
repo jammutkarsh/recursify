@@ -150,3 +150,12 @@ export async function importCsv(text: string) {
   }
   return result;
 }
+
+export const RESET_PHRASE = "delete all my data";
+
+/** Wipe everything the user created: reviews, custom problems, My list and settings. */
+export async function resetAll(confirm: unknown) {
+  if (String(confirm ?? "").trim().toLowerCase() !== RESET_PHRASE) throw new Error(`Type "${RESET_PHRASE}" to confirm`);
+  const d = await db();
+  await d.batch(["reviews", "custom_problems", "my_list", "settings"].map((t) => d.prepare(`DELETE FROM ${t}`)));
+}
