@@ -15,7 +15,8 @@ export default defineConfig(({ mode }) => ({
     // Only the demo declares its domain; the main Worker's custom domain is set per deployment in the dashboard.
     ...(DEMO && { domains: ["demo.recursify.utkarshchourasia.in"] }), // same as DEMO_URL in src/lib/links.ts
     // Run near the D1 database: each request makes several D1 round trips. The demo has no database.
-    ...(!DEMO && { placement: { mode: "smart" as const } }),
+    // workers.dev and version preview URLs stay on (Cloudflare's default) even when a custom domain is declared.
+    ...(!DEMO && { placement: { mode: "smart" as const }, workersDev: true, previewUrls: true }),
     // Optional build variables, only for a deployment whose settings were changed in the dashboard: after
     // that, CI deploys stop unless this config matches what's live, including the domain and the D1 id.
     ...(!DEMO && process.env.CUSTOM_DOMAIN && { domains: [process.env.CUSTOM_DOMAIN] }),
