@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { RENAMED_IDS } from "./catalog";
 
 // Ordered, append-only. Never edit or drop an applied step; add a new one.
 const MIGRATIONS = [
@@ -34,6 +35,13 @@ const MIGRATIONS = [
    )`,
   `INSERT OR IGNORE INTO lists (id, name, created_at) VALUES ('custom', 'My list', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
   `INSERT OR IGNORE INTO list_items (list_id, problem_id, section, added_at) SELECT 'custom', problem_id, NULL, added_at FROM my_list ORDER BY added_at`,
+  // Five NeetCode problems had made-up ids; move their history and list entries to LeetCode's real slugs.
+  // One statement per step (a step is a single prepared statement). Order is fixed by RENAMED_IDS, which only ever grows.
+  ...Object.entries(RENAMED_IDS).flatMap(([from, to]) => [
+    `UPDATE reviews SET problem_id = '${to}' WHERE problem_id = '${from}'`,
+    `UPDATE OR IGNORE list_items SET problem_id = '${to}' WHERE problem_id = '${from}'`,
+    `DELETE FROM list_items WHERE problem_id = '${from}'`, // left over only if the list already had the correct id
+  ]),
 ];
 
 let ready: Promise<D1Database> | null = null;

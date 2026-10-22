@@ -44,6 +44,15 @@ export const BUILTIN_LISTS: ListDef[] = [
 ];
 
 export const builtinProblem = (id: string) => problems.get(id);
+
+/** Built-in ids that were wrong (not LeetCode's slugs) and were corrected; old data is migrated (db.ts, demo.ts). */
+export const RENAMED_IDS: Record<string, string> = {
+  "two-sum-ii": "two-sum-ii-input-array-is-sorted",
+  "lowest-common-ancestor-of-a-bst": "lowest-common-ancestor-of-a-binary-search-tree",
+  "construct-binary-tree-from-preorder-and-inorder": "construct-binary-tree-from-preorder-and-inorder-traversal",
+  "implement-trie": "implement-trie-prefix-tree",
+  "merge-triplets": "merge-triplets-to-form-target-triplet",
+};
 export const builtinByTitle = (title: string) => [...problems.values()].find((p) => p.title.toLowerCase() === title.toLowerCase());
 
 /** A list the user made, shaped like a built-in one and grouped into the same topics, so the polygon stays small. */

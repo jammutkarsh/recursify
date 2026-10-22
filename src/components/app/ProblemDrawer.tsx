@@ -16,6 +16,7 @@ export function ProblemDrawer({ id, onClose }: { id: string; onClose: () => void
   const { model, data, today } = app;
   const [editing, setEditing] = useState(false);
   const [confirm, setConfirm] = useState<null | "reset" | "delete">(null);
+  const [removing, setRemoving] = useState<string | null>(null); // list id awaiting a second click
   useKey((e) => { if (e.key === "Escape") onClose(); });
   if (!model || !data) return null;
   const p = model.problem(id);
@@ -46,9 +47,16 @@ export function ProblemDrawer({ id, onClose }: { id: string; onClose: () => void
 
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="mr-1 text-[13px] font-medium">Lists</span>
-          {inLists.map((l) => (
+          {inLists.map((l) => removing === l.id ? (
+            // Removing takes a second click: one stray click on ✕ shouldn't silently drop a problem from a list.
+            <span key={l.id} className="flex items-center gap-1 rounded-[6px] bg-forgot-tint py-0.5 pr-1 pl-2 text-xs font-semibold text-forgot-text">
+              Remove from {l.name}?
+              <button type="button" autoFocus onClick={() => { app.removeFromList(l.id, id); setRemoving(null); }} className="rounded bg-forgot px-1.5 text-white">Remove</button>
+              <button type="button" onClick={() => setRemoving(null)} className="rounded px-1 hover:bg-forgot/15">Keep</button>
+            </span>
+          ) : (
             <span key={l.id} className="flex items-center gap-1 rounded-[6px] bg-primary-tint py-0.5 pr-1 pl-2 text-xs font-semibold text-primary">
-              {l.name}<button type="button" aria-label={`Remove from ${l.name}`} onClick={() => app.removeFromList(l.id, id)} className="rounded px-1 hover:bg-primary/15"><X className="size-3" /></button>
+              {l.name}<button type="button" aria-label={`Remove from ${l.name}`} onClick={() => setRemoving(l.id)} className="rounded px-1 hover:bg-primary/15"><X className="size-3" /></button>
             </span>
           ))}
           {addable.length ? <Picker label="Add to list" value="" onChange={(v) => v && app.addToList(v, id)} className="h-7 text-xs"

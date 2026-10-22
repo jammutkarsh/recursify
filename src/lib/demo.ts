@@ -1,7 +1,7 @@
 // The public demo (built with NEXT_PUBLIC_DEMO=true): no sign-in, no D1. The app's /api calls are answered
 // here from localStorage instead, so each visitor gets a private sandbox that lives only in their browser.
 // Import and export follow the same rules as the server (src/lib/transfer.ts).
-import { BUILTIN_LISTS, builtinProblem, type Problem } from "./catalog";
+import { BUILTIN_LISTS, builtinProblem, RENAMED_IDS, type Problem } from "./catalog";
 import type { AppData } from "./derive";
 import { fromDay, toDay, type Grade } from "./fsrs";
 import { loadCatalog } from "./leetcode";
@@ -34,8 +34,14 @@ function seed(today: string): Store {
 
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const read = (): Store => {
-  try { const raw = localStorage.getItem(KEY); if (raw) return JSON.parse(raw) as Store; } catch { /* blocked storage: start fresh */ }
+  try { const raw = localStorage.getItem(KEY); if (raw) return renameIds(JSON.parse(raw) as Store); } catch { /* blocked storage: start fresh */ }
   const s = seed(today()); write(s); return s;
+};
+/** Same fix as the D1 migration: corrected built-in ids (RENAMED_IDS). */
+const renameIds = (s: Store): Store => {
+  const to = (id: string) => RENAMED_IDS[id] ?? id;
+  return { ...s, reviews: s.reviews.map((r) => ({ ...r, problemId: to(r.problemId) })),
+    lists: s.lists.map((l) => ({ ...l, items: l.items.filter((it, i, all) => all.findIndex((x) => to(x.id) === to(it.id)) === i).map((it) => ({ ...it, id: to(it.id) })) })) };
 };
 function write(s: Store) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* private mode: changes last until reload */ } }
 

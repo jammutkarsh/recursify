@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import raw from "../data/leetcode.json";
 import { buildModel } from "./derive";
-import { combineLists, sectionsOf, userList, type Problem } from "./catalog";
+import { BUILTIN_LISTS, builtinProblem, combineLists, RENAMED_IDS, sectionsOf, userList, type Problem } from "./catalog";
 import { unpack } from "./leetcode";
 import { DEFAULT_SETTINGS, type UserList } from "./settings";
 
@@ -42,4 +42,10 @@ test("the model shows lists the user made, even empty ones, but hides the defaul
   expect(ids(filled)).toEqual(["custom", "list-1"]);
   expect(sectionsOf(buildModel(filled, "2026-10-21").list("custom"))).toEqual(["Linked Lists", "Graphs"]);
   expect(buildModel(filled, "2026-10-21").listsOf("lru-cache").map((l) => l.name)).toEqual(["My list"]);
+});
+
+test("every built-in problem uses LeetCode's real slug, so its link and catalog lookups work", () => {
+  const wrong = BUILTIN_LISTS.flatMap((l) => l.sections.map((s) => s.id)).filter((id) => !catalog.has(id));
+  expect(wrong).toEqual([]);
+  for (const [from, to] of Object.entries(RENAMED_IDS)) { expect(builtinProblem(from)).toBeUndefined(); expect(builtinProblem(to)?.url).toContain(to); }
 });
